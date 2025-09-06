@@ -3,9 +3,9 @@
   "name": "Yandex Disk Sync",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
+  "main": "main.js",
   "description": "Two-way sync of Obsidian vault (notes and attachments) with Yandex.Disk via REST + OAuth.",
   "author": "Ivan / Codex",
   "authorUrl": "",
   "isDesktopOnly": false
 }
-
