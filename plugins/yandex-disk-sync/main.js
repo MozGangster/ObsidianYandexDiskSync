@@ -1,10 +1,3 @@
-// Obsidian plugin: Yandex Disk Sync (MVP per PRD)
-// Plain JS implementation to avoid build tooling; uses Obsidian's requestUrl for HTTP.
-// Notes:
-// - OAuth: Use implicit flow in external browser, paste access token back into settings.
-// - Sync: Basic two-way sync (upload/download). Conflict: duplicates both versions.
-// - Limitations: 3-way merge and rename detection are TODO; current MVP favors safety.
-
 const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder } = require('obsidian');
 
 const PLUGIN_ID = 'yandex-disk-sync';
