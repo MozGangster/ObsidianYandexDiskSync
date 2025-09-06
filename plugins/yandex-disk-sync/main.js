@@ -27,11 +27,13 @@ const I18N = {
     'desc.strategy': 'How to resolve simultaneous edits: newest-wins uses timestamps (overwrites the older side; within tolerance prefers local); duplicate-both creates two local copies ("… (conflict … local)" and "… (conflict … remote)").',
     'desc.tolerance': 'Time buffer for newest-wins. If local vs cloud modified times differ by less than this many seconds, treat them as equal and prefer the local version. Increase for clock drift; decrease for stricter comparison.',
     'desc.autoSync': 'Minutes between automatic syncs. 0 disables. Runs only while Obsidian is open. Typical: 5–30 min.',
+    'desc.syncOnStartup': 'Run a sync automatically when Obsidian starts (after UI is ready).',
     'desc.syncNow': 'Run sync with current settings (mode, deletes, filters)',
     'desc.dryRun': 'Preview the sync plan without making changes. Opens a diagnostics window with the list of planned operations.',
     'desc.diagnostics': 'Open diagnostics: shows environment summary (paths, mode), last API check, last HTTP error, and recent logs. Set how many lines to show below.',
     'desc.maxSize': 'Skip local files larger than this during uploads. Default: 200.',
     'desc.concurrency': 'Parallel transfers (upload/download). High values may cause 429/409; recommended 1–3 / 1–4.',
+    'desc.syncOnStartupDelay': 'Delay before startup sync runs (seconds). 0 = no delay.',
   },
   ru: {
     'desc.clientId': 'ID клиента Яндекс OAuth (нужен для подключения)',
@@ -48,11 +50,13 @@ const I18N = {
     'desc.strategy': 'Как разрешать одновременные правки: newest-wins — по времени (перезаписывает более старую сторону; в пределах допуска предпочитает локальную); duplicate-both — создаёт две локальные копии ("… (conflict … local)" и "… (conflict … remote)").',
     'desc.tolerance': 'Допуск по времени для newest-wins. Если разница между временем изменения локальной и облачной версии меньше этого количества секунд, считаем их равными и берём локальную. Увеличьте при рассинхроне часов; уменьшите для более строгой проверки.',
     'desc.autoSync': 'Интервал (в минутах) между автосинхронизациями. 0 — выключено. Работает только пока открыт Obsidian. Типично: 5–30 мин.',
+    'desc.syncOnStartup': 'Автоматически запускать синхронизацию при старте Obsidian (после загрузки интерфейса).',
     'desc.syncNow': 'Запустить синхронизацию по текущим настройкам (режим, удаления, фильтры)',
     'desc.dryRun': 'Предпросмотр плана без изменений. Откроется окно диагностики со списком запланированных операций.',
     'desc.diagnostics': 'Открыть диагностику: сводка окружения (пути, режим), последняя проверка API, последний HTTP‑код и последние строки журнала. Ниже можно указать, сколько строк показывать.',
     'desc.maxSize': 'Пропускать локальные файлы больше этого порога при выгрузке. По умолчанию: 200.',
     'desc.concurrency': 'Параллельные передачи (upload/download). Большие значения могут вызвать 429/409; рекомендация 1–3 / 1–4.',
+    'desc.syncOnStartupDelay': 'Задержка перед запуском синхронизации при старте (в секундах). 0 = без задержки.',
   },
 };
 
@@ -93,6 +97,9 @@ const DEFAULT_SETTINGS = {
   // Vault folder subdir under remote base
   vaultFolderName: '',
   _autoVaultNameApplied: false,
+  // Startup behavior
+  syncOnStartup: false,
+  syncOnStartupDelaySec: 3,
   // i18n
   lang: 'auto', // 'auto' | 'en' | 'ru'
 };
@@ -586,6 +593,32 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
           }),
       );
 
+    new Setting(containerEl)
+      .setName('Sync on startup')
+      .setDesc(this.plugin.t('desc.syncOnStartup'))
+      .addToggle((tg) =>
+        tg
+          .setValue(!!this.plugin.settings.syncOnStartup)
+          .onChange(async (v) => {
+            this.plugin.settings.syncOnStartup = !!v;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName('Startup delay (sec)')
+      .setDesc(this.plugin.t('desc.syncOnStartupDelay'))
+      .addText((txt) =>
+        txt
+          .setPlaceholder('0')
+          .setValue(String(this.plugin.settings.syncOnStartupDelaySec || 0))
+          .onChange(async (v) => {
+            const n = Math.max(0, Math.min(3600, Number(v) || 0));
+            this.plugin.settings.syncOnStartupDelaySec = n;
+            await this.plugin.saveSettings();
+          }),
+      );
+
     containerEl.createEl('h3', { text: 'Actions' });
 
     new Setting(containerEl)
@@ -653,6 +686,20 @@ class YandexDiskSyncPlugin extends Plugin {
 
     if (this.settings.showStatusBar) this.initStatusBar();
     this.initRibbon();
+
+    // Optional: run sync on startup after layout is ready
+    if (this.settings.syncOnStartup) {
+      const start = () => {
+        if (this.settings.accessToken) this.syncNow(false).catch(() => {});
+      };
+      const delayMs = Math.max(0, (Number(this.settings.syncOnStartupDelaySec) || 0) * 1000);
+      try {
+        if (this.app?.workspace?.onLayoutReady) this.app.workspace.onLayoutReady(() => setTimeout(start, delayMs));
+        else setTimeout(start, Math.max(2000, delayMs));
+      } catch (_) {
+        setTimeout(start, Math.max(2000, delayMs));
+      }
+    }
 
     this.registerEvent(this.app.vault.on('modify', (f) => this.onLocalEvent('modify', f)));
     this.registerEvent(this.app.vault.on('create', (f) => this.onLocalEvent('create', f)));
