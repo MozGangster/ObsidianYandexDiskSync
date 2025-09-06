@@ -15,40 +15,44 @@ const I18N = {
   en: {
     'desc.clientId': 'Yandex OAuth Client ID (required for Connect)',
     'desc.accessToken': 'Paste token manually or use Connect below. Stored in plugin data.',
-    'desc.oauthControls': 'Connect or disconnect Yandex Disk account',
+    'desc.oauthControls': 'Connect: open OAuth in the browser and paste the token; Disconnect: remove the locally stored token; Manage on Yandex: open the OAuth portal to manage your app/tokens.',
     'desc.oauthBaseUrl': 'Used for authorization and portal links',
     'desc.oauthScopes': 'Leave empty to use scopes configured for your Yandex app. For app-folder only, keep this empty to avoid invalid_scope.',
     'desc.remoteBase': "Root on Yandex.Disk. For app-folder tokens, use 'app:/' (recommended). The vault will sync into the subfolder below.",
     'desc.vaultFolderName': 'Subfolder under remote base where this vault is stored (only the folder name). Default: current vault name',
     'desc.localScope': 'Relative path in vault to sync (empty = whole vault)',
     'desc.ignorePatterns': 'Comma-separated globs (e.g., .obsidian/**, **/.trash/**)',
-    'desc.syncMode': 'two-way | upload | download',
-    'desc.deletePolicy': 'mirror = reflect deletions; skip = keep files',
-    'desc.strategy': 'Choose how to handle simultaneous edits',
-    'desc.tolerance': 'Applies only to newest-wins; differences below this are treated as equal',
-    'desc.autoSync': '0 = off; runs when Obsidian is active',
+    'desc.syncMode': 'Direction of sync: two-way (both directions), upload (local → cloud), download (cloud → local). Deletions follow Delete policy.',
+    'desc.deletePolicy': 'Controls deletions. mirror: apply removals across sides based on last sync index (only if the other side did not change). skip: never delete automatically. Start with skip for safety; use mirror for true mirroring.',
+    'desc.strategy': 'How to resolve simultaneous edits: newest-wins uses timestamps (overwrites the older side; within tolerance prefers local); duplicate-both creates two local copies ("… (conflict … local)" and "… (conflict … remote)").',
+    'desc.tolerance': 'Time buffer for newest-wins. If local vs cloud modified times differ by less than this many seconds, treat them as equal and prefer the local version. Increase for clock drift; decrease for stricter comparison.',
+    'desc.autoSync': 'Minutes between automatic syncs. 0 disables. Runs only while Obsidian is open. Typical: 5–30 min.',
     'desc.syncNow': 'Run sync with current settings (mode, deletes, filters)',
-    'desc.dryRun': 'Show plan only (no changes on disk/cloud)',
-    'desc.diagnostics': 'Open diagnostics and set number of log lines to display',
+    'desc.dryRun': 'Preview the sync plan without making changes. Opens a diagnostics window with the list of planned operations.',
+    'desc.diagnostics': 'Open diagnostics: shows environment summary (paths, mode), last API check, last HTTP error, and recent logs. Set how many lines to show below.',
+    'desc.maxSize': 'Skip local files larger than this during uploads. Default: 200.',
+    'desc.concurrency': 'Parallel transfers (upload/download). High values may cause 429/409; recommended 1–3 / 1–4.',
   },
   ru: {
     'desc.clientId': 'ID клиента Яндекс OAuth (нужен для подключения)',
     'desc.accessToken': 'Вставьте токен вручную или используйте Connect ниже. Хранится в данных плагина.',
-    'desc.oauthControls': 'Подключение/отключение аккаунта Яндекс.Диска',
+    'desc.oauthControls': 'Connect: открыть OAuth в браузере и затем вставить токен; Disconnect: удалить локально сохранённый токен; Manage on Yandex: открыть портал OAuth для управления приложением/токенами.',
     'desc.oauthBaseUrl': 'Используется для авторизации и ссылок портала',
     'desc.oauthScopes': 'Оставьте пустым, чтобы использовать права, настроенные у вашего приложения. Для режима «папка приложения» оставьте пустым, иначе будет invalid_scope.',
     'desc.remoteBase': "Корневая папка на Яндекс.Диске. Для токенов с доступом к папке приложения используйте 'app:/' (рекомендуется). Вольт будет синхронизироваться в подпапку ниже.",
     'desc.vaultFolderName': 'Подпапка внутри удалённой базы для этого вольта (только имя папки). По умолчанию — имя текущего вольта.',
-    'desc.localScope': 'Относительный путь внутри вольта для синхронизации (пусто = весь вольт)',
+    'desc.localScope': 'Относительный путь внутри вольта для синхронизации (пусто = весь Vault)',
     'desc.ignorePatterns': 'Список шаблонов через запятую (например, .obsidian/**, **/.trash/**)',
-    'desc.syncMode': 'two-way | upload | download (режим синхронизации)',
-    'desc.deletePolicy': 'mirror — отражать удаления; skip — не удалять файлы',
-    'desc.strategy': 'Как обрабатывать одновременные изменения',
-    'desc.tolerance': 'Только для newest-wins; различия меньше порога считаются равными',
-    'desc.autoSync': '0 — выключено; запускается, пока Obsidian активен',
+    'desc.syncMode': 'Направление синхронизации: two-way (в обе стороны), upload (локально → облако), download (облако → локально). Удаления зависят от Delete policy.',
+    'desc.deletePolicy': 'Управляет удалениями. mirror: отражать удаления между сторонами по индексу последней синхронизации (только если другая сторона не менялась). skip: ничего не удалять автоматически. Для начала безопаснее skip; mirror — для полного зеркала.',
+    'desc.strategy': 'Как разрешать одновременные правки: newest-wins — по времени (перезаписывает более старую сторону; в пределах допуска предпочитает локальную); duplicate-both — создаёт две локальные копии ("… (conflict … local)" и "… (conflict … remote)").',
+    'desc.tolerance': 'Допуск по времени для newest-wins. Если разница между временем изменения локальной и облачной версии меньше этого количества секунд, считаем их равными и берём локальную. Увеличьте при рассинхроне часов; уменьшите для более строгой проверки.',
+    'desc.autoSync': 'Интервал (в минутах) между автосинхронизациями. 0 — выключено. Работает только пока открыт Obsidian. Типично: 5–30 мин.',
     'desc.syncNow': 'Запустить синхронизацию по текущим настройкам (режим, удаления, фильтры)',
-    'desc.dryRun': 'Показать только план (без изменений на диске/в облаке)',
-    'desc.diagnostics': 'Открыть диагностику и задать число строк журнала',
+    'desc.dryRun': 'Предпросмотр плана без изменений. Откроется окно диагностики со списком запланированных операций.',
+    'desc.diagnostics': 'Открыть диагностику: сводка окружения (пути, режим), последняя проверка API, последний HTTP‑код и последние строки журнала. Ниже можно указать, сколько строк показывать.',
+    'desc.maxSize': 'Пропускать локальные файлы больше этого порога при выгрузке. По умолчанию: 200.',
+    'desc.concurrency': 'Параллельные передачи (upload/download). Большие значения могут вызвать 429/409; рекомендация 1–3 / 1–4.',
   },
 };
 
@@ -87,7 +91,8 @@ const DEFAULT_SETTINGS = {
   showStatusBar: true,
   progressLines: 25,
   // Vault folder subdir under remote base
-  vaultFolderName: 'vault',
+  vaultFolderName: '',
+  _autoVaultNameApplied: false,
   // i18n
   lang: 'auto', // 'auto' | 'en' | 'ru'
 };
@@ -308,6 +313,21 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
     try { containerEl.addClass('yds-copyable'); } catch (_) {}
     containerEl.createEl('h2', { text: 'Yandex Disk Sync — Settings' });
 
+    // Language selector at the top
+    new Setting(containerEl)
+      .setName('Language')
+      .setDesc('Language for field descriptions (Auto/English/Русский)')
+      .addDropdown((dd) =>
+        dd
+          .addOptions({ auto: 'Auto', en: 'English', ru: 'Русский' })
+          .setValue(this.plugin.settings.lang || 'auto')
+          .onChange(async (v) => {
+            this.plugin.settings.lang = v;
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+      );
+
     new Setting(containerEl)
       .setName('Client ID')
       .setDesc(this.plugin.t('desc.clientId'))
@@ -372,19 +392,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
       )
       .addButton((b) => b.setButtonText('Open portal').onClick(() => this.plugin.openOAuthManagement()));
 
-    new Setting(containerEl)
-      .setName('Language')
-      .setDesc('Language for field descriptions (Auto/English/Русский)')
-      .addDropdown((dd) =>
-        dd
-          .addOptions({ auto: 'Auto', en: 'English', ru: 'Русский' })
-          .setValue(this.plugin.settings.lang || 'auto')
-          .onChange(async (v) => {
-            this.plugin.settings.lang = v;
-            await this.plugin.saveSettings();
-            this.display();
-          }),
-      );
+    
 
     new Setting(containerEl)
       .setName('OAuth scopes (optional)')
@@ -435,7 +443,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
             let name = (v || '').trim();
             // Strip slashes and backslashes to keep it as a folder name only
             name = name.replace(/[\\/]+/g, '');
-            if (!name) name = 'vault';
+            if (!name) name = this.plugin.getSuggestedVaultFolderName();
             this.plugin.settings.vaultFolderName = name;
             await this.plugin.saveSettings();
           }),
@@ -527,6 +535,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Max file size (MB)')
+      .setDesc(this.plugin.t('desc.maxSize'))
       .addText((txt) =>
         txt
           .setValue(String(this.plugin.settings.maxSizeMB))
@@ -540,6 +549,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Concurrency (upload/download)')
+      .setDesc(this.plugin.t('desc.concurrency'))
       .addText((txt) =>
         txt
           .setPlaceholder('upload')
@@ -581,7 +591,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Sync now')
       .setDesc(this.plugin.t('desc.syncNow'))
-      .addButton((b) => b.setCta().setButtonText('Run').onClick(() => this.plugin.syncNow(false)));
+      .addButton((b) => b.setCta().setButtonText('Sync').onClick(() => this.plugin.syncNow(false)));
 
     new Setting(containerEl)
       .setName('Dry-run (plan only)')
@@ -616,6 +626,14 @@ class YandexDiskSyncPlugin extends Plugin {
     this.statusBar = null;
 
     await this.loadSettings();
+    // One-time migration: if vaultFolderName is unset or legacy 'vault', apply suggested vault name
+    try {
+      if (!this.settings._autoVaultNameApplied && (!this.settings.vaultFolderName || this.settings.vaultFolderName === 'vault')) {
+        this.settings.vaultFolderName = this.getSuggestedVaultFolderName();
+        this.settings._autoVaultNameApplied = true;
+        await this.saveSettings();
+      }
+    } catch (_) {}
 
     this.addCommand({ id: 'sync-now', name: 'Sync now', callback: () => this.syncNow(false) });
     this.addCommand({ id: 'dry-run', name: 'Dry-run (plan only)', callback: () => this.syncNow(true) });
@@ -933,7 +951,7 @@ class YandexDiskSyncPlugin extends Plugin {
     let base = (this.settings.remoteBasePath || 'app:/').replace(/\/+$/, '');
     let folder = (this.settings.vaultFolderName || this.getSuggestedVaultFolderName() || 'vault').trim();
     folder = folder.replace(/[\\/]+/g, '');
-    if (!folder) folder = 'vault';
+    if (!folder) folder = this.getSuggestedVaultFolderName() || 'vault';
     return `${base}/${folder}`;
   }
 
