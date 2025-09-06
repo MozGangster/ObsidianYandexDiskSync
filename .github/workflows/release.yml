@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check tag matches manifest version
+        shell: bash
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          # Strip leading 'v' from tag (expected format vX.Y.Z)
+          TAG_VER="${TAG_NAME#v}"
+          FILE="plugins/yandex-disk-sync/manifest.json"
+          if ! [ -f "$FILE" ]; then
+            echo "::error file=$FILE::manifest.json not found"; exit 1; fi
+          MANIFEST_VER=$(grep -Po '"version"\s*:\s*"\K[^" ]+' "$FILE")
+          echo "Tag: $TAG_NAME -> $TAG_VER"; echo "Manifest version: $MANIFEST_VER"
+          if [ -z "$MANIFEST_VER" ]; then echo "::error::Failed to read version from manifest.json"; exit 1; fi
+          if [ "$TAG_VER" != "$MANIFEST_VER" ]; then
+            echo "::error::Version mismatch: tag=$TAG_VER, manifest.json=$MANIFEST_VER"
+            exit 1
+          fi
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p dist
+          cp plugins/yandex-disk-sync/main.js dist/
+          cp plugins/yandex-disk-sync/manifest.json dist/
+          if [ -f plugins/yandex-disk-sync/styles.css ]; then cp plugins/yandex-disk-sync/styles.css dist/; fi
+          ls -la dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
