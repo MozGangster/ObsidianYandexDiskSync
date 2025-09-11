@@ -18,10 +18,6 @@ Yandex Disk Sync (плагин Obsidian)
 - Автосинхронизация по интервалу + синхронизация при старте (с задержкой).
 - Пояснения к полям локализованы (RU/EN). Названия полей — на английском.
 
-Установка
-1) Скопируйте папку плагина в `<vault>/.obsidian/plugins/yandex-disk-sync/>`.
-2) В Obsidian включите плагин в Settings → Community plugins.
-
 Регистрация OAuth‑приложения (Client ID)
 1) Откройте https://oauth.yandex.ru (или https://oauth.yandex.com).
 2) Создайте приложение с доступом к «Yandex.Disk REST API». Для большинства сценариев — «доступ к папке приложения».

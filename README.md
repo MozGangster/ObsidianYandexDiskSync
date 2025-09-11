@@ -22,10 +22,6 @@ Features
 - Auto‑sync by interval + sync on startup (with delay).
 - Field descriptions localized (RU/EN). Field names are in English.
 
-Installation
-1) Copy the plugin folder to `<vault>/.obsidian/plugins/yandex-disk-sync/>`.
-2) In Obsidian, enable the plugin in Settings → Community plugins.
-
 OAuth application registration (Client ID)
 1) Open https://oauth.yandex.ru (or https://oauth.yandex.com).
 2) Create an application with access to “Yandex.Disk REST API”. For most scenarios choose “access to the application folder”.
