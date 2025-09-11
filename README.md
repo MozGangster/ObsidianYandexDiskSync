@@ -1,6 +1,6 @@
 Yandex Disk Sync (Obsidian plugin)
 
-[Russian](Documentation/README_ru.md) | [English](./README.md)
+[Russian](Docs/README_ru.md) | [English](./README.md)
 
 [![BuildCI](https://github.com/MozGangster/ObsidianYandexDiskSync/actions/workflows/release.yml/badge.svg)](https://github.com/MozGangster/ObsidianYandexDiskSync/actions/workflows/release.yml)
 
@@ -26,12 +26,12 @@ OAuth application registration (Client ID)
 1) Open https://oauth.yandex.ru (or https://oauth.yandex.com).
 2) Create an application with access to “Yandex.Disk REST API”. For most scenarios choose “access to the application folder”.
 
-![](Documentation/image_0.png)
-![](Documentation/image_1.png)
+![](Docs/image_0.png)
+![](Docs/image_1.png)
 
 3) When creating, specify
 
-![](Documentation/image_2.png)
+![](Docs/image_2.png)
 
 - Application name, e.g., ObsidianYandexDiskSync
 - Your email
@@ -39,7 +39,7 @@ OAuth application registration (Client ID)
 
 4) Copy the Client ID.
 
-![](Documentation/image_3.png)
+![](Docs/image_3.png)
 
 Initial setup (Settings → Yandex Disk Sync)
 - Client ID: paste the Client ID.
