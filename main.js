@@ -911,7 +911,7 @@ class YandexDiskSyncPlugin extends Plugin {
     const api = this.lastApiCheck;
     const lines = Math.max(1, Math.min(this.settings.logLimit || 500, Number(this.settings.diagnosticsLines || 50)));
     const summary = [
-      `Version: 0.1.0`,
+      `Version: 0.1.2`,
       `Local scope: ${this.settings.localBasePath || '(root)'}`,
       `Remote base: ${this.getRemoteBase()}`,
       `Sync mode: ${this.settings.syncMode}, Delete: ${this.settings.deletePolicy}`,
@@ -940,7 +940,7 @@ class YandexDiskSyncPlugin extends Plugin {
           const api2 = this.lastApiCheck;
           const lines2 = Math.max(1, Math.min(this.settings.logLimit || 500, Number(this.settings.diagnosticsLines || 50)));
           const updated = [
-            `Version: 0.1.0`,
+            `Version: 0.1.2`,
             `Local scope: ${this.settings.localBasePath || '(root)'}`,
             `Remote base: ${this.settings.remoteBasePath}`,
             `Sync mode: ${this.settings.syncMode}, Delete: ${this.settings.deletePolicy}`,
