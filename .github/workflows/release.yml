@@ -21,7 +21,7 @@ jobs:
           TAG_NAME="${GITHUB_REF_NAME}"
           # Strip leading 'v' from tag (expected format vX.Y.Z)
           TAG_VER="${TAG_NAME#v}"
-          FILE="plugins/yandex-disk-sync/manifest.json"
+          FILE="manifest.json"
           if ! [ -f "$FILE" ]; then
             echo "::error file=$FILE::manifest.json not found"; exit 1; fi
           MANIFEST_VER=$(grep -Po '"version"\s*:\s*"\K[^" ]+' "$FILE")
@@ -35,9 +35,9 @@ jobs:
       - name: Prepare artifacts
         run: |
           mkdir -p dist
-          cp plugins/yandex-disk-sync/main.js dist/
-          cp plugins/yandex-disk-sync/manifest.json dist/
-          if [ -f plugins/yandex-disk-sync/styles.css ]; then cp plugins/yandex-disk-sync/styles.css dist/; fi
+          cp main.js dist/
+          cp manifest.json dist/
+          if [ -f styles.css ]; then cp styles.css dist/; fi
           ls -la dist
 
       - name: Create GitHub Release
