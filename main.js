@@ -474,6 +474,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
               .split(',')
               .map((s) => s.trim())
               .filter(Boolean);
+            this.plugin.invalidateIgnoreCache();
             await this.plugin.saveSettings();
           }),
       );
@@ -727,6 +728,7 @@ class YandexDiskSyncPlugin extends Plugin {
     const data = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings || {});
     this.index = data?.index || { files: {}, lastSyncAt: null };
+    this.invalidateIgnoreCache();
   }
 
   async saveSettings() {
@@ -1093,6 +1095,10 @@ class YandexDiskSyncPlugin extends Plugin {
     return this._ignoreCache.some((re) => re.test(rel));
   }
 
+  invalidateIgnoreCache() {
+    this._ignoreCache = null;
+  }
+
   // HTTP wrapper with token + backoff for 429; supports no-retry statuses
   async http(method, url, opts = {}, isBinary = false) {
     const token = this.settings.accessToken;
@@ -1380,6 +1386,11 @@ class YandexDiskSyncPlugin extends Plugin {
 
   async syncNow(dryRun = false) {
     try {
+      if (this.currentRun?.active) {
+        new Notice('Sync is already running');
+        this.openProgress();
+        return;
+      }
       if (!this.settings.accessToken) {
         new Notice('Connect account in settings first.');
         return;
@@ -1476,7 +1487,8 @@ class YandexDiskSyncPlugin extends Plugin {
     // Update index
     // Re-scan local state after operations
     const localAfter = this.listLocalFilesInScope();
-    const remoteAfter = await this.ydListFolderRecursive(this.settings.remoteBasePath || '/');
+    const remoteRoot = this.getRemoteBase();
+    const remoteAfter = await this.ydListFolderRecursive(remoteRoot || '/');
     const remoteMap = new Map(remoteAfter.map((x) => [x.rel, x]));
     const newIndex = {};
     for (const loc of localAfter) {
