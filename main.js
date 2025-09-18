@@ -142,39 +142,14 @@ class DiagnosticsModal extends Modal {
     const { contentEl, modalEl, titleEl } = this;
     contentEl.empty();
 
-    // Title in the modal header
     titleEl.setText('Yandex Disk Sync — Diagnostics');
 
-    // Make modal resizable (user can drag edges/corner)
-    modalEl.style.width = '70vw';
-    modalEl.style.height = '70vh';
-    modalEl.style.maxWidth = '90vw';
-    modalEl.style.maxHeight = '90vh';
-    modalEl.style.minWidth = '400px';
-    modalEl.style.minHeight = '200px';
-    modalEl.style.resize = 'both';
-    modalEl.style.overflow = 'hidden';
-    modalEl.style.display = 'flex';
-    modalEl.style.flexDirection = 'column';
+    modalEl.addClass('yds-modal');
+    modalEl.addClass('yds-diagnostics-modal');
+    contentEl.addClass('yds-modal-content');
 
-    // Let content fill available space and scroll as needed
-    contentEl.style.display = 'flex';
-    contentEl.style.flex = '1 1 auto';
-    contentEl.style.minHeight = '0';
-    // Ensure text is selectable/copyable
-    modalEl.style.userSelect = 'text';
-    contentEl.style.userSelect = 'text';
-    // vendor-prefixed for wider Electron/WebKit support
-    modalEl.style.webkitUserSelect = 'text';
-    contentEl.style.webkitUserSelect = 'text';
-
-    // Toolbar with actions (Copy All)
-    const toolbar = contentEl.createEl('div');
-    toolbar.style.display = 'flex';
-    toolbar.style.justifyContent = 'flex-end';
-    toolbar.style.gap = '8px';
-    toolbar.style.margin = '0 0 8px 0';
-    const copyBtn = toolbar.createEl('button', { text: 'Copy All' });
+    const toolbar = contentEl.createEl('div', { cls: 'yds-modal-toolbar' });
+    const copyBtn = toolbar.createEl('button', { text: 'Copy all' });
     copyBtn.addEventListener('click', async () => {
       const txt = this.text || '';
       try {
@@ -198,15 +173,7 @@ class DiagnosticsModal extends Modal {
       }
     });
 
-    const pre = (this.preEl = contentEl.createEl('pre'));
-    pre.style.whiteSpace = 'pre-wrap';
-    pre.style.flex = '1 1 auto';
-    pre.style.width = '100%';
-    pre.style.margin = '0';
-    pre.style.overflow = 'auto';
-    pre.style.userSelect = 'text';
-    pre.style.webkitUserSelect = 'text';
-    pre.style.cursor = 'text';
+    const pre = (this.preEl = contentEl.createEl('pre', { cls: 'yds-modal-pre' }));
     pre.setText(this.text);
   }
 }
@@ -221,28 +188,12 @@ class ProgressModal extends Modal {
     const { contentEl, modalEl, titleEl } = this;
     contentEl.empty();
     titleEl.setText('Yandex Disk Sync — Progress');
-    modalEl.style.width = '60vw';
-    modalEl.style.height = '50vh';
-    modalEl.style.resize = 'both';
-    modalEl.style.display = 'flex';
-    modalEl.style.flexDirection = 'column';
-    contentEl.style.display = 'flex';
-    contentEl.style.flex = '1 1 auto';
-    contentEl.style.minHeight = '0';
-    // Make text selectable/copyable
-    modalEl.style.userSelect = 'text';
-    contentEl.style.userSelect = 'text';
-    modalEl.style.webkitUserSelect = 'text';
-    contentEl.style.webkitUserSelect = 'text';
 
-    // Left vertical toolbar
-    const toolbar = contentEl.createEl('div');
-    toolbar.style.display = 'flex';
-    toolbar.style.flexDirection = 'column';
-    toolbar.style.alignItems = 'stretch';
-    toolbar.style.gap = '8px';
-    toolbar.style.marginRight = '12px';
-    toolbar.style.minWidth = '180px';
+    modalEl.addClass('yds-modal');
+    modalEl.addClass('yds-progress-modal');
+    contentEl.addClass('yds-progress-content');
+
+    const toolbar = contentEl.createEl('div', { cls: 'yds-progress-toolbar' });
 
     const syncBtn = toolbar.createEl('button', { text: 'Sync now' });
     syncBtn.onclick = () => {
@@ -256,7 +207,7 @@ class ProgressModal extends Modal {
       this.plugin.syncNow(true);
     };
 
-    const copyBtn = toolbar.createEl('button', { text: 'Copy All' });
+    const copyBtn = toolbar.createEl('button', { text: 'Copy all' });
     copyBtn.onclick = async () => {
       const txt = this.plugin.getProgressSummary();
       try {
@@ -282,14 +233,7 @@ class ProgressModal extends Modal {
     const cancelBtn = toolbar.createEl('button', { text: 'Cancel' });
     cancelBtn.onclick = () => this.plugin.cancelCurrentRun();
 
-    const pre = (this.preEl = contentEl.createEl('pre'));
-    pre.style.whiteSpace = 'pre-wrap';
-    pre.style.flex = '1 1 auto';
-    pre.style.margin = '0';
-    pre.style.overflow = 'auto';
-    pre.style.userSelect = 'text';
-    pre.style.webkitUserSelect = 'text';
-    pre.style.cursor = 'text';
+    const pre = (this.preEl = contentEl.createEl('pre', { cls: 'yds-modal-pre' }));
 
     const render = () => {
       pre.setText(this.plugin.getProgressSummary());
@@ -311,7 +255,6 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     try { containerEl.addClass('yds-copyable'); } catch (_) {}
-    containerEl.createEl('h2', { text: 'Yandex Disk Sync — Settings' });
 
     // Language selector at the top
     new Setting(containerEl)
@@ -342,7 +285,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
       );
 
     const tokenSetting = new Setting(containerEl)
-      .setName('Access Token')
+      .setName('Access token')
       .setDesc(this.plugin.t('desc.accessToken'))
       .addText((txt) =>
         txt
@@ -505,7 +448,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
           }),
       );
 
-    containerEl.createEl('h3', { text: 'Conflict handling' });
+    new Setting(containerEl).setName('Conflict handling').setHeading();
 
     new Setting(containerEl)
       .setName('Strategy')
@@ -613,7 +556,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
           }),
       );
 
-    containerEl.createEl('h3', { text: 'Actions' });
+    new Setting(containerEl).setName('Actions').setHeading();
 
     new Setting(containerEl)
       .setName('Sync now')
@@ -625,7 +568,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
       .setDesc(this.plugin.t('desc.dryRun'))
       .addButton((b) => b.setButtonText('Build plan').onClick(() => this.plugin.syncNow(true)));
 
-    containerEl.createEl('h3', { text: 'Diagnostics' });
+    new Setting(containerEl).setName('Diagnostics').setHeading();
     new Setting(containerEl)
       .setName('Diagnostics')
       .setDesc(this.plugin.t('desc.diagnostics'))
@@ -738,7 +681,8 @@ class YandexDiskSyncPlugin extends Plugin {
   initStatusBar() {
     try {
       this.statusBar = this.addStatusBarItem();
-      this.statusBar.style.cursor = 'pointer';
+      try { this.statusBar.addClass('yds-status-bar'); }
+      catch (_) { this.statusBar.classList?.add('yds-status-bar'); }
       this.statusBar.onclick = () => this.openProgress();
       this.updateStatusBar('Idle');
     } catch (_) {}
@@ -778,12 +722,24 @@ class YandexDiskSyncPlugin extends Plugin {
         this.ribbonEl.setAttribute('title', txt);
       }
     } catch (_) {}
-    let color = '#bbb';
-    if (state === 'Running' || state === 'Uploading' || state === 'Downloading') color = '#4da3ff';
-    else if (state === 'Throttled') color = '#e6a700';
-    else if (state === 'Error') color = '#ff5c5c';
-    else if (state === 'Done') color = '#4caf50';
-    this.statusBar.style.color = color;
+    const stateClasses = ['is-running', 'is-throttled', 'is-error', 'is-done'];
+    for (const cls of stateClasses) {
+      try { this.statusBar.removeClass(cls); }
+      catch (_) { this.statusBar.classList?.remove(cls); }
+    }
+    const classMap = {
+      Running: 'is-running',
+      Uploading: 'is-running',
+      Downloading: 'is-running',
+      Throttled: 'is-throttled',
+      Error: 'is-error',
+      Done: 'is-done',
+    };
+    const cls = classMap[state];
+    if (cls) {
+      try { this.statusBar.addClass(cls); }
+      catch (_) { this.statusBar.classList?.add(cls); }
+    }
     this.statusBar.title = `Last sync: ${this.index.lastSyncAt || 'never'}`;
   }
 

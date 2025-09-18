@@ -1,0 +1,89 @@
+/* Styling helpers for Yandex Disk Sync plugin */
+.yds-modal {
+  max-width: 90vw;
+  max-height: 90vh;
+  min-width: 25rem;
+  min-height: 12.5rem;
+  display: flex;
+  flex-direction: column;
+  resize: both;
+  overflow: hidden;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.yds-diagnostics-modal {
+  width: 70vw;
+  height: 70vh;
+}
+
+.yds-progress-modal {
+  width: 60vw;
+  height: 50vh;
+}
+
+.yds-modal-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.yds-modal-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-4-2, 0.5rem);
+  margin: 0 0 var(--size-4-2, 0.5rem) 0;
+}
+
+.yds-modal-pre {
+  flex: 1 1 auto;
+  width: 100%;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.yds-progress-content {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  user-select: text;
+  -webkit-user-select: text;
+  gap: var(--size-4-2, 0.5rem);
+}
+
+.yds-progress-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--size-4-2, 0.5rem);
+  margin-right: var(--size-4-2, 0.5rem);
+  min-width: 11.25rem;
+}
+
+.yds-status-bar {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.yds-status-bar.is-running {
+  color: var(--interactive-accent);
+}
+
+.yds-status-bar.is-throttled {
+  color: var(--text-warning, var(--color-orange, var(--interactive-accent)));
+}
+
+.yds-status-bar.is-error {
+  color: var(--text-error, var(--color-red, var(--text-muted)));
+}
+
+.yds-status-bar.is-done {
+  color: var(--text-success, var(--color-green, var(--interactive-accent)));
+}

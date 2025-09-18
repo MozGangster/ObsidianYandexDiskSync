@@ -63,7 +63,7 @@ Initial setup (Settings → Yandex Disk Sync)
 Usage
 - Ribbon button: starts “Sync” (if already running, won’t start another).
 - Status bar: shows state and counters; click to open the Progress window.
-- Progress window: phase, counters, recent operations; buttons Sync, Dry‑run, Copy All, Cancel.
+- Progress window: phase, counters, recent operations; buttons Sync, Dry-run, Copy all, Cancel.
 - Commands: “Sync now”, “Dry‑run (plan only)”, “Diagnostics”.
 
 How synchronization works (brief)

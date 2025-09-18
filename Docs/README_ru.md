@@ -59,7 +59,7 @@ Yandex Disk Sync (плагин Obsidian)
 Использование
 - Кнопка на боковой панели (Ribbon): запускает «Sync» (если уже идёт — не запускает второй раз).
 - Статус‑бар: показывает состояние и счётчики; клик — открывает окно Progress.
-- Окно Progress: фаза, счётчики, последние операции; кнопки Sync, Dry‑run, Copy All, Cancel.
+- Окно Progress: фаза, счётчики, последние операции; кнопки Sync, Dry‑run, Copy all, Cancel.
 - Команды: «Sync now», «Dry‑run (plan only)», «Diagnostics».
 
 Как работает синхронизация (кратко)
@@ -92,4 +92,3 @@ Diagnostics
 - «File name cannot contain \\ / :»: плагин избегает алиасов в локальных путях; если видите — проверьте целевой локальный путь в Diagnostics.
 
 Документация Yandex Disk REST: https://yandex.com/dev/disk/rest/
-
