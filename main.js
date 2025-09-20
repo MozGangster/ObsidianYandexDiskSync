@@ -676,6 +676,10 @@ class YandexDiskSyncPlugin extends Plugin {
 
   onunload() {
     if (this._autoTimer) clearInterval(this._autoTimer);
+    try {
+      if (this._progressModal) this._progressModal.close();
+    } catch (_) {}
+    this._progressModal = null;
     try { this._copyStyleEl?.remove(); } catch (_) {}
   }
 
@@ -1273,7 +1277,17 @@ class YandexDiskSyncPlugin extends Plugin {
         const msg = status ? `HTTP ${status}${body ? `: ${String(body).slice(0, 200)}` : ''}` : (e?.message || String(e));
         this.lastHttpError = msg;
         const shouldRetry = !(noRetryStatuses.has?.(status)) && attempt < maxAttempts;
-        if (!shouldRetry) throw new Error(msg);
+        if (!shouldRetry) {
+          if (e instanceof Error) {
+            try {
+              if (msg && e.message !== msg) e.message = msg;
+            } catch (_) {}
+            throw e;
+          }
+          const err = new Error(msg);
+          try { err.cause = e; } catch (_) {}
+          throw err;
+        }
         const backoff = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
         this.logWarn(`HTTP error (attempt ${attempt}): ${msg}. Retrying in ${backoff}ms`);
         await delay(backoff);
