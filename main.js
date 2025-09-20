@@ -9,9 +9,9 @@ const INDEX_FILE_VERSION = 1;
 // Simple i18n dictionary for field descriptions only
 const I18N = {
   en: {
-    'desc.clientId': 'Yandex OAuth Client ID (required for Connect)',
+    'desc.clientId': 'Yandex OAuth Client ID used for Connect.',
     'desc.accessToken': 'Paste token manually. Value saves automatically. Use Open OAuth token page to launch the OAuth flow. Stored in plugin data.',
-    'desc.oauthBaseUrl': 'Used for authorization and portal links',
+    'desc.oauthBaseUrl': 'Used for authorization and portal links.',
     'desc.oauthScopes': 'Leave empty to use scopes configured for your Yandex app. For app-folder only, keep this empty to avoid invalid_scope.',
     'desc.remoteBase': "Root on Yandex.Disk. For app-folder tokens, use 'app:/' (recommended). The vault will sync into the subfolder below.",
     'desc.vaultFolderName': 'Subfolder under remote base where this vault is stored (only the folder name). Default: current vault name',
@@ -29,11 +29,16 @@ const I18N = {
     'desc.maxSize': 'Skip local files larger than this during uploads. Default: 200.',
     'desc.concurrency': 'Parallel transfers (upload/download). High values may cause 429/409; recommended 1–3 / 1–4.',
     'desc.syncOnStartupDelay': 'Delay before startup sync runs (seconds). 0 = no delay.',
+    'heading.required': 'Required settings',
+    'heading.optional': 'Optional settings',
+    'heading.conflict': 'Conflict handling',
+    'heading.actions': 'Actions',
+    'heading.diagnostics': 'Diagnostics',
   },
   ru: {
-    'desc.clientId': 'ID клиента Яндекс OAuth (нужен для подключения)',
+    'desc.clientId': 'ID клиента Яндекс OAuth, используется для подключения.',
     'desc.accessToken': 'Вставьте токен вручную — значение сохраняется автоматически. Кнопка Open OAuth token page откроет страницу OAuth. Значение хранится в данных плагина.',
-    'desc.oauthBaseUrl': 'Используется для авторизации и ссылок портала',
+    'desc.oauthBaseUrl': 'Используется для авторизации и ссылок портала.',
     'desc.oauthScopes': 'Оставьте пустым, чтобы использовать права, настроенные у вашего приложения. Для режима «папка приложения» оставьте пустым, иначе будет invalid_scope.',
     'desc.remoteBase': "Корневая папка на Яндекс.Диске. Для токенов с доступом к папке приложения используйте 'app:/' (рекомендуется). Вольт будет синхронизироваться в подпапку ниже.",
     'desc.vaultFolderName': 'Подпапка внутри удалённой базы для этого вольта (только имя папки). По умолчанию — имя текущего вольта.',
@@ -51,6 +56,11 @@ const I18N = {
     'desc.maxSize': 'Пропускать локальные файлы больше этого порога при выгрузке. По умолчанию: 200.',
     'desc.concurrency': 'Параллельные передачи (upload/download). Большие значения могут вызвать 429/409; рекомендация 1–3 / 1–4.',
     'desc.syncOnStartupDelay': 'Задержка перед запуском синхронизации при старте (в секундах). 0 = без задержки.',
+    'heading.required': 'Обязательные параметры',
+    'heading.optional': 'Дополнительные параметры',
+    'heading.conflict': 'Разрешение конфликтов',
+    'heading.actions': 'Действия',
+    'heading.diagnostics': 'Диагностика',
   },
 };
 
@@ -303,6 +313,8 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
           }),
       );
 
+    new Setting(containerEl).setName(this.plugin.t('heading.required')).setHeading();
+
     new Setting(containerEl)
       .setName('OAuth base URL')
       .setDesc(this.plugin.t('desc.oauthBaseUrl'))
@@ -359,6 +371,8 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
         .setButtonText('Open OAuth token page')
         .onClick(() => this.plugin.startOAuthFlow()),
     );
+
+    new Setting(containerEl).setName(this.plugin.t('heading.optional')).setHeading();
 
     new Setting(containerEl)
       .setName('OAuth scopes (optional)')
@@ -471,7 +485,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
           }),
       );
 
-    new Setting(containerEl).setName('Conflict handling').setHeading();
+    new Setting(containerEl).setName(this.plugin.t('heading.conflict')).setHeading();
 
     new Setting(containerEl)
       .setName('Strategy')
@@ -579,7 +593,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
           }),
       );
 
-    new Setting(containerEl).setName('Actions').setHeading();
+    new Setting(containerEl).setName(this.plugin.t('heading.actions')).setHeading();
 
     new Setting(containerEl)
       .setName('Sync now')
@@ -591,7 +605,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
       .setDesc(this.plugin.t('desc.dryRun'))
       .addButton((b) => b.setButtonText('Build plan').onClick(() => this.plugin.syncNow(true)));
 
-    new Setting(containerEl).setName('Diagnostics').setHeading();
+    new Setting(containerEl).setName(this.plugin.t('heading.diagnostics')).setHeading();
     new Setting(containerEl)
       .setName('Diagnostics')
       .setDesc(this.plugin.t('desc.diagnostics'))
