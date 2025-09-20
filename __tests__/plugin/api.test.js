@@ -10,7 +10,7 @@ describe('Yandex Disk API helpers', () => {
     jest.useRealTimers();
   });
 
-  test('ydGetUploadHref формирует правильный URL', async () => {
+  test('ydGetUploadHref builds the correct URL', async () => {
     const plugin = createPlugin();
     plugin.http = jest.fn().mockResolvedValue({ href: 'https://upload' });
 
@@ -24,7 +24,7 @@ describe('Yandex Disk API helpers', () => {
     expect(href).toBe('https://upload');
   });
 
-  test('ydEnsureFolder игнорирует 409 и пробрасывает другие ошибки', async () => {
+  test('ydEnsureFolder ignores 409 and rethrows other errors', async () => {
     const plugin = createPlugin();
     const conflict = Object.assign(new Error('HTTP 409: Folder exists'), { message: 'HTTP 409: Folder exists' });
     plugin.http = jest
@@ -36,7 +36,7 @@ describe('Yandex Disk API helpers', () => {
     await expect(plugin.ydEnsureFolder('disk:/Root/folder')).rejects.toThrow('Boom');
   });
 
-  test('ydDelete вызывает HTTP с DELETE', async () => {
+  test('ydDelete issues HTTP DELETE', async () => {
     const plugin = createPlugin();
     plugin.http = jest.fn().mockResolvedValue();
 
@@ -48,7 +48,7 @@ describe('Yandex Disk API helpers', () => {
     );
   });
 
-  test('ydGetResource запрашивает JSON', async () => {
+  test('ydGetResource requests JSON', async () => {
     const plugin = createPlugin();
     plugin.http = jest.fn().mockResolvedValue({ ok: true });
 
@@ -62,7 +62,7 @@ describe('Yandex Disk API helpers', () => {
     expect(data).toEqual({ ok: true });
   });
 
-  test('listLocalFilesInScope учитывает исключения и лимит размера', () => {
+  test('listLocalFilesInScope respects exclusions and size limit', () => {
     const plugin = createPlugin({
       settings: {
         localBasePath: 'vault',

@@ -16,12 +16,12 @@ function makeRemote(rel, overrides = {}) {
   );
 }
 
-describe('план синхронизации', () => {
+describe('sync plan', () => {
   beforeEach(() => {
     jest.useRealTimers();
   });
 
-  test('новый локальный файл планируется на выгрузку', async () => {
+  test('a new local file is scheduled for upload', async () => {
     const plugin = createPlugin();
     const local = { rel: 'note.md', mtime: 2000, size: 5, tfile: makeTFile('note.md') };
 
@@ -41,7 +41,7 @@ describe('план синхронизации', () => {
     });
   });
 
-  test('новый удалённый файл планируется на загрузку', async () => {
+  test('a new remote file is scheduled for download', async () => {
     const plugin = createPlugin();
     const remote = makeRemote('todo.md', { modified: new Date(5000).toISOString() });
 
@@ -62,7 +62,7 @@ describe('план синхронизации', () => {
     });
   });
 
-  test('при стратегии duplicate-both возникает операция конфликта', async () => {
+  test('duplicate-both strategy creates a conflict operation', async () => {
     const plugin = createPlugin({
       settings: { conflictStrategy: 'duplicate-both', timeSkewToleranceSec: 0 },
       index: {
@@ -95,7 +95,7 @@ describe('план синхронизации', () => {
     expect(plan[0]).toMatchObject({ type: 'conflict', rel: 'note.md', from: local, remote });
   });
 
-  test('newest-wins выбирает более свежую локальную версию вне толеранса', async () => {
+  test('newest-wins selects newer local version outside tolerance', async () => {
     const plugin = createPlugin({
       settings: { conflictStrategy: 'newest-wins', timeSkewToleranceSec: 1 },
       index: {
@@ -127,7 +127,7 @@ describe('план синхронизации', () => {
     expect(plan[0]).toMatchObject({ type: 'upload', rel: 'note.md', from: local, toAbs: remote.path });
   });
 
-  test('newest-wins выбирает удалённую версию при более свежем облаке', async () => {
+  test('newest-wins selects remote version when cloud is fresher', async () => {
     const plugin = createPlugin({
       settings: { conflictStrategy: 'newest-wins', timeSkewToleranceSec: 0 },
       index: {
@@ -159,7 +159,7 @@ describe('план синхронизации', () => {
     expect(plan[0]).toMatchObject({ type: 'download', rel: 'note.md', fromAbs: remote.path });
   });
 
-  test('политика mirror при отсутствии локального файла оставляет скачивание (удаление подавляется приоритетом)', async () => {
+  test('mirror policy keeps download when local file is missing (deletion suppressed by priority)', async () => {
     const modified = new Date('2024-01-01T00:00:00.000Z').toISOString();
     const modifiedTime = new Date(modified).getTime();
     const remote = makeRemote('archive.md', {
@@ -191,7 +191,7 @@ describe('план синхронизации', () => {
     expect(plan[0]).toMatchObject({ type: 'download', rel: 'archive.md' });
   });
 
-  test('политика mirror при удалении в облаке оставляет выгрузку (удаление подавляется приоритетом)', async () => {
+  test('mirror policy keeps upload when remote file was deleted (deletion suppressed by priority)', async () => {
     const plugin = createPlugin({
       index: {
         files: {

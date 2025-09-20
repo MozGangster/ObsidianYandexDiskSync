@@ -5,12 +5,12 @@ const { createPlugin } = require('../../tests/testUtils');
 
 const flush = () => Promise.resolve().then(() => Promise.resolve());
 
-describe('UI и диагностика', () => {
+describe('UI and diagnostics', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  test('showDiagnostics строит сводку и обновляет её после verifyToken', async () => {
+  test('showDiagnostics builds summary and refreshes it after verifyToken', async () => {
     const opened = [];
     jest.spyOn(obsidian.Modal.prototype, 'open').mockImplementation(function () {
       opened.push(this);
@@ -39,7 +39,7 @@ describe('UI и диагностика', () => {
     expect(modal.text).toContain('OK for disk:/Base');
   });
 
-  test('openProgress переиспользует модалку', () => {
+  test('openProgress reuses the modal', () => {
     const plugin = createPlugin();
     const openSpy = jest.spyOn(obsidian.Modal.prototype, 'open');
 
@@ -52,7 +52,7 @@ describe('UI и диагностика', () => {
     expect(openSpy).toHaveBeenCalledTimes(2);
   });
 
-  test('cancelCurrentRun отмечает отмену и логирует предупреждение', () => {
+  test('cancelCurrentRun marks cancellation and logs a warning', () => {
     const plugin = createPlugin();
     plugin.currentRun = { active: true, canceled: false };
 

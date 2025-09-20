@@ -6,12 +6,12 @@ const { createPlugin, createMockAdapter } = require('../../tests/testUtils');
 
 const { createEmptyIndex, computeIndexHash } = helpers;
 
-describe('индекс и его сохранение', () => {
+describe('index persistence', () => {
   beforeEach(() => {
     jest.useRealTimers();
   });
 
-  test('readIndexFile без адаптера возвращает пустой индекс', async () => {
+  test('readIndexFile returns empty index without adapter', async () => {
     const plugin = createPlugin();
     plugin.app.vault.adapter = null;
 
@@ -22,7 +22,7 @@ describe('индекс и его сохранение', () => {
     expect(res.hash).toBe(computeIndexHash(createEmptyIndex()));
   });
 
-  test('readIndexFile без файла создает пустой индекс', async () => {
+  test('readIndexFile creates empty index when file is missing', async () => {
     const adapter = createMockAdapter();
     const plugin = createPlugin({ adapter });
 
@@ -33,7 +33,7 @@ describe('индекс и его сохранение', () => {
     expect(res.index).toEqual(createEmptyIndex());
   });
 
-  test('readIndexFile восстанавливает данные и хэш', async () => {
+  test('readIndexFile restores data and hash', async () => {
     const adapter = createMockAdapter();
     const plugin = createPlugin({ adapter });
     const payload = {
@@ -50,7 +50,7 @@ describe('индекс и его сохранение', () => {
     expect(res.hash).toBe(computeIndexHash(payload));
   });
 
-  test('readIndexFile логирует при битом JSON', async () => {
+  test('readIndexFile logs when JSON is broken', async () => {
     const adapter = createMockAdapter();
     const plugin = createPlugin({ adapter });
     await adapter.write(plugin.getIndexFilePath(), '{broken');
@@ -58,12 +58,12 @@ describe('индекс и его сохранение', () => {
 
     const res = await plugin.readIndexFile();
 
-    expect(plugin.logWarn).toHaveBeenCalledWith(expect.stringContaining('Индекс повреждён'));
+    expect(plugin.logWarn).toHaveBeenCalledWith(expect.stringContaining('Index is corrupted'));
     expect(res.index).toEqual(createEmptyIndex());
     expect(res.existed).toBe(true);
   });
 
-  test('readIndexFile логирует при ошибке чтения', async () => {
+  test('readIndexFile logs when read fails', async () => {
     const adapter = createMockAdapter();
     adapter.read.mockRejectedValue(new Error('disk error'));
     adapter.exists.mockResolvedValueOnce(true);
@@ -71,11 +71,11 @@ describe('индекс и его сохранение', () => {
 
     const res = await plugin.readIndexFile();
 
-    expect(plugin.logWarn).toHaveBeenCalledWith(expect.stringContaining('Не удалось прочитать файл индекса'));
+    expect(plugin.logWarn).toHaveBeenCalledWith(expect.stringContaining('Failed to read index file'));
     expect(res.existed).toBe(false);
   });
 
-  test('writeIndexFile создает директорию и записывает JSON', async () => {
+  test('writeIndexFile creates directory and writes JSON', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockImplementation(async (path) => adapter.__hasDir(path));
     const plugin = createPlugin({ adapter });
@@ -101,14 +101,14 @@ describe('индекс и его сохранение', () => {
     }));
   });
 
-  test('writeIndexFile бросает без адаптера', async () => {
+  test('writeIndexFile throws without adapter', async () => {
     const plugin = createPlugin();
     plugin.app.vault.adapter = null;
 
-    await expect(plugin.writeIndexFile(createEmptyIndex())).rejects.toThrow('Vault adapter недоступен');
+    await expect(plugin.writeIndexFile(createEmptyIndex())).rejects.toThrow('Vault adapter unavailable');
   });
 
-  test('persistIndexIfNeeded записывает только при изменениях', async () => {
+  test('persistIndexIfNeeded writes only on changes', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockResolvedValue(true);
     const plugin = createPlugin({ adapter });
@@ -126,7 +126,7 @@ describe('индекс и его сохранение', () => {
     expect(plugin.indexHash).toBe(computeIndexHash(plugin.index));
   });
 
-  test('persistIndexIfNeeded переписывает, если файл отсутствует', async () => {
+  test('persistIndexIfNeeded rewrites when the file is missing', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockResolvedValue(false);
     const plugin = createPlugin({ adapter });

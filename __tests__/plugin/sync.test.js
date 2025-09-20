@@ -4,13 +4,13 @@ const obsidian = require('obsidian');
 const PluginClass = require('../../main.js');
 const { createPlugin } = require('../../tests/testUtils');
 
-describe('syncNow и UI состояния', () => {
+describe('syncNow and UI state', () => {
   beforeEach(() => {
     jest.useRealTimers();
     jest.clearAllMocks();
   });
 
-  test('syncNow в режиме dry-run не выполняет план и завершает успешно', async () => {
+  test('syncNow in dry-run mode skips plan execution and finishes successfully', async () => {
     const plugin = createPlugin();
     const plan = [{ type: 'upload', rel: 'a', toAbs: 'disk:/a', from: {} }];
     const remoteMap = new Map();
@@ -26,7 +26,7 @@ describe('syncNow и UI состояния', () => {
     expect(plugin.logInfo).toHaveBeenCalledWith(expect.stringContaining('Plan (1 ops) built'));
   });
 
-  test('syncNow без токена показывает уведомление', async () => {
+  test('syncNow without token shows notice', async () => {
     const noticeSpy = jest.spyOn(obsidian, 'Notice');
     const plugin = createPlugin({ settings: { accessToken: '' } });
 
@@ -36,7 +36,7 @@ describe('syncNow и UI состояния', () => {
     expect(plugin.logInfo).not.toHaveBeenCalledWith(expect.stringContaining('Sync started'));
   });
 
-  test('syncNow выполняет план и завершает успешно', async () => {
+  test('syncNow runs plan and finishes successfully', async () => {
     const plugin = createPlugin();
     const plan = [{ type: 'upload', rel: 'a', toAbs: 'disk:/a', from: {} }];
     const remoteMap = new Map();
@@ -50,7 +50,7 @@ describe('syncNow и UI состояния', () => {
     expect(plugin.finishRun).toHaveBeenCalledWith(true);
   });
 
-  test('syncNow ловит ошибки и завершает с ошибкой', async () => {
+  test('syncNow catches errors and finishes with failure', async () => {
     const plugin = createPlugin();
     plugin.buildPlan = jest.fn().mockRejectedValue(new Error('boom'));
     plugin.finishRun = jest.fn();
@@ -61,10 +61,10 @@ describe('syncNow и UI состояния', () => {
     expect(plugin.logError).toHaveBeenCalledWith(expect.stringContaining('Sync failed'));
   });
 
-  test('startRun/setRunPlan/finishRun обновляют состояние и статус', () => {
+  test('startRun/setRunPlan/finishRun update state and status', () => {
     const plugin = createPlugin();
     plugin.updateStatusBar = jest.fn();
-    // восстановим реальные методы отчета
+    // restore real reporting methods
     plugin.reportOpStart = PluginClass.prototype.reportOpStart.bind(plugin);
     plugin.reportOpEnd = PluginClass.prototype.reportOpEnd.bind(plugin);
 
@@ -90,7 +90,7 @@ describe('syncNow и UI состояния', () => {
     expect(plugin.updateStatusBar).toHaveBeenCalledWith('Done');
   });
 
-  test('getProgressSummary отражает последние операции', () => {
+  test('getProgressSummary reflects recent operations', () => {
     const plugin = createPlugin();
     plugin.reportOpStart = PluginClass.prototype.reportOpStart.bind(plugin);
     plugin.reportOpEnd = PluginClass.prototype.reportOpEnd.bind(plugin);

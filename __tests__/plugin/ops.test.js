@@ -2,20 +2,20 @@ jest.mock('obsidian');
 
 const { createPlugin, makeTFile } = require('../../tests/testUtils');
 
-describe('операции синхронизации', () => {
+describe('sync operations', () => {
   beforeEach(() => {
     jest.useRealTimers();
   });
 
-  test('remoteAbsToRel корректно обрабатывает app:/ и disk:/', () => {
+  test('remoteAbsToRel handles app:/ and disk:/ correctly', () => {
     const plugin = createPlugin();
 
-    expect(plugin.remoteAbsToRel('disk:/Приложения/YDS/TestVault/file.md', 'app:/TestVault')).toBe('file.md');
+    expect(plugin.remoteAbsToRel('disk:/Applications/YDS/TestVault/file.md', 'app:/TestVault')).toBe('file.md');
     expect(plugin.remoteAbsToRel('disk:/Root/Sub/file.md', 'disk:/Root/Sub')).toBe('file.md');
     expect(plugin.remoteAbsToRel('disk:/Other/path.txt', 'disk:/Root/Sub')).toBe('Other/path.txt');
   });
 
-  test('ydListFolderRecursive обходит каталоги и файлы', async () => {
+  test('ydListFolderRecursive traverses directories and files', async () => {
     const plugin = createPlugin();
     const firstCall = {
       _embedded: {
@@ -46,7 +46,7 @@ describe('операции синхронизации', () => {
     expect(files[1]).toMatchObject({ rel: 'Dir/deep.md', name: 'deep.md', revision: 'r2' });
   });
 
-  test('runWithConcurrency ограничивает параллелизм и логирует ошибки', async () => {
+  test('runWithConcurrency limits concurrency and logs errors', async () => {
     const plugin = createPlugin();
     const items = [1, 2, 3, 4];
     let active = 0;
@@ -66,7 +66,7 @@ describe('операции синхронизации', () => {
     expect(plugin.logWarn).toHaveBeenCalledWith(expect.stringContaining('Task failed'));
   });
 
-  test('runWithConcurrency прекращает работу при отмене', async () => {
+  test('runWithConcurrency stops when canceled', async () => {
     const plugin = createPlugin();
     plugin.currentRun = { canceled: true };
     const task = jest.fn();
@@ -76,7 +76,7 @@ describe('операции синхронизации', () => {
     expect(task).not.toHaveBeenCalled();
   });
 
-  test('uploadLocalFile читает файл и отправляет по href', async () => {
+  test('uploadLocalFile reads file and uploads via href', async () => {
     const plugin = createPlugin();
     const data = new Uint8Array([1, 2, 3]);
     plugin.ydEnsureFolder = jest.fn().mockResolvedValue();
@@ -92,7 +92,7 @@ describe('операции синхронизации', () => {
     expect(plugin.http).toHaveBeenCalledWith('PUT', 'https://upload', { body: data, contentType: 'application/octet-stream' });
   });
 
-  test('downloadRemoteFile обновляет существующий файл', async () => {
+  test('downloadRemoteFile updates existing file', async () => {
     const plugin = createPlugin();
     const bin = new Uint8Array([5, 6]);
     plugin.ydGetDownloadHref = jest.fn().mockResolvedValue('https://download');
@@ -106,7 +106,7 @@ describe('операции синхронизации', () => {
     expect(plugin.http).toHaveBeenCalledWith('GET', 'https://download', {}, true);
   });
 
-  test('downloadRemoteFile создает файл в существующей папке', async () => {
+  test('downloadRemoteFile creates file in existing folder', async () => {
     const plugin = createPlugin();
     const bin = new Uint8Array([7]);
     plugin.ydGetDownloadHref = jest.fn().mockResolvedValue('https://download2');
@@ -119,7 +119,7 @@ describe('операции синхронизации', () => {
     expect(plugin.app.vault.createBinary).toHaveBeenCalledWith('notes/sub/file.bin/file.bin', bin);
   });
 
-  test('downloadRemoteFile создает новый путь при отсутствии файла', async () => {
+  test('downloadRemoteFile creates path when file is missing', async () => {
     const plugin = createPlugin();
     const bin = new Uint8Array([9]);
     plugin.ydGetDownloadHref = jest.fn().mockResolvedValue('https://d');
@@ -133,7 +133,7 @@ describe('операции синхронизации', () => {
     expect(plugin.app.vault.createBinary).toHaveBeenCalledWith('new/file.md', bin);
   });
 
-  test('ensureFolderForPath создает недостающие директории', async () => {
+  test('ensureFolderForPath creates missing directories', async () => {
     const plugin = createPlugin();
     const seen = new Set();
     plugin.app.vault.getAbstractFileByPath.mockImplementation((path) => {
@@ -149,7 +149,7 @@ describe('операции синхронизации', () => {
     expect(plugin.app.vault.createFolder).toHaveBeenCalledWith('foo/bar');
   });
 
-  test('resolveConflictByDuplication дублирует markdown-файлы', async () => {
+  test('resolveConflictByDuplication duplicates markdown files', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2024-01-01T00:00:00Z'));
     const plugin = createPlugin();
     plugin.ydGetDownloadHref = jest.fn().mockResolvedValue('https://download');
@@ -166,7 +166,7 @@ describe('операции синхронизации', () => {
     expect(plugin.logWarn).toHaveBeenCalledWith(expect.stringContaining(expectedLocal));
   });
 
-  test('resolveConflictByDuplication дублирует бинарные файлы', async () => {
+  test('resolveConflictByDuplication duplicates binary files', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2024-01-01T00:00:00Z'));
     const plugin = createPlugin();
     plugin.ydGetDownloadHref = jest.fn().mockResolvedValue('https://download');

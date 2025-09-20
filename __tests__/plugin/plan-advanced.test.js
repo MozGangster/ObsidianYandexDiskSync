@@ -2,12 +2,12 @@ jest.mock('obsidian');
 
 const { createPlugin, makeTFile } = require('../../tests/testUtils');
 
-describe('buildPlan — расширенные сценарии', () => {
+describe('buildPlan - advanced scenarios', () => {
   beforeEach(() => {
     jest.useRealTimers();
   });
 
-  test('mirror удаляет удалённый файл при неизменённом состоянии', async () => {
+  test('mirror deletes remote file when state is unchanged', async () => {
     const plugin = createPlugin({
       index: {
         files: {
@@ -45,7 +45,7 @@ describe('buildPlan — расширенные сценарии', () => {
     });
   });
 
-  test('mirror не удаляет, если удалённый файл изменился', async () => {
+  test('mirror does not delete when the remote file changed', async () => {
     const plugin = createPlugin({
       index: {
         files: {
@@ -77,7 +77,7 @@ describe('buildPlan — расширенные сценарии', () => {
     expect(plan.find((op) => op.type === 'remote-delete')).toBeUndefined();
   });
 
-  test('duplicate-both при конфликте создаёт операцию conflict', async () => {
+  test('duplicate-both creates a conflict operation on divergence', async () => {
     const plugin = createPlugin({
       settings: { conflictStrategy: 'duplicate-both' },
       index: {
@@ -109,7 +109,7 @@ describe('buildPlan — расширенные сценарии', () => {
     expect(plan).toContainEqual(expect.objectContaining({ type: 'conflict', rel: 'note.md' }));
   });
 
-  test('повторный запуск syncNow при активном процессе открывает прогресс', async () => {
+  test('second syncNow call with active run opens progress', async () => {
     const plugin = createPlugin();
     plugin.openProgress = jest.fn();
     plugin.currentRun = { active: true };

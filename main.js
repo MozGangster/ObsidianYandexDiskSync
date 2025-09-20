@@ -768,7 +768,7 @@ class YandexDiskSyncPlugin extends Plugin {
       if (!(await adapter.exists(dir))) await adapter.mkdir(dir);
       this._indexDirEnsured = true;
     } catch (e) {
-      this.logWarn(`Не удалось создать директорию индекса: ${e?.message || e}`);
+      this.logWarn(`Failed to create index directory: ${e?.message || e}`);
     }
   }
 
@@ -804,7 +804,7 @@ class YandexDiskSyncPlugin extends Plugin {
       if (raw && raw.trim().length) {
         try { parsed = JSON.parse(raw); }
         catch (err) {
-          this.logWarn(`Индекс повреждён, будет восстановлен: ${err?.message || err}`);
+          this.logWarn(`Index is corrupted, will be rebuilt: ${err?.message || err}`);
           parsed = {};
         }
       }
@@ -819,14 +819,14 @@ class YandexDiskSyncPlugin extends Plugin {
       return { index, hash, existed: true };
     } catch (e) {
       this._indexFileKnownExists = false;
-      this.logWarn(`Не удалось прочитать файл индекса: ${e?.message || e}`);
+      this.logWarn(`Failed to read index file: ${e?.message || e}`);
       return { index: createEmptyIndex(), hash: null, existed: false };
     }
   }
 
   async writeIndexFile(index) {
     const adapter = this.app?.vault?.adapter;
-    if (!adapter) throw new Error('Vault adapter недоступен');
+    if (!adapter) throw new Error('Vault adapter unavailable');
     await this.ensureIndexDir();
     const filesSource = index.files && typeof index.files === 'object' ? index.files : {};
     const files = {};

@@ -42,7 +42,7 @@ OAuth application registration (Client ID)
 ![](Docs/image_3.png)
 
 Initial setup (Settings → Yandex Disk Sync)
-- Language: pick the language of help texts (Auto/English/Русский).
+- Language: pick the language of help texts (Auto/English/Russian).
 - **Required settings** (group labelled the same in the UI):
   - OAuth base URL: `https://oauth.yandex.ru` (RU accounts) or `https://oauth.yandex.com` (international). Use the nearby `Open OAuth portal page` button if you need to open the management site.
   - Client ID: paste the Client ID you received when registering the application. The same `Open OAuth portal page` button is available here for quick access to the Yandex portal.

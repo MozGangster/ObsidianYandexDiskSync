@@ -2,12 +2,12 @@ jest.mock('obsidian');
 
 const { createPlugin } = require('../../tests/testUtils');
 
-describe('фильтры синхронизации', () => {
+describe('sync filters', () => {
   beforeEach(() => {
     jest.useRealTimers();
   });
 
-  test('toLocalRel и fromLocalRel учитывают базовый путь', () => {
+  test('toLocalRel and fromLocalRel respect the base path', () => {
     const plugin = createPlugin({ settings: { localBasePath: 'vault/notes' } });
 
     expect(plugin.toLocalRel('vault/notes/daily/today.md')).toBe('daily/today.md');
@@ -15,7 +15,7 @@ describe('фильтры синхронизации', () => {
     expect(plugin.fromLocalRel('daily/today.md')).toBe('vault/notes/daily/today.md');
   });
 
-  test('inScope проверяет попадание в базовую папку', () => {
+  test('inScope checks membership in the base folder', () => {
     const plugin = createPlugin({ settings: { localBasePath: 'vault/notes' } });
 
     expect(plugin.inScope('vault/notes', 'vault/notes')).toBe(true);
@@ -23,7 +23,7 @@ describe('фильтры синхронизации', () => {
     expect(plugin.inScope('vault/other', 'vault/other')).toBe(false);
   });
 
-  test('matchesIgnore использует кеш и сбрасывает его', () => {
+  test('matchesIgnore uses the cache and clears it', () => {
     const plugin = createPlugin({ settings: { ignorePatterns: ['**/*.log'] } });
 
     expect(plugin.matchesIgnore('logs/app.log')).toBe(true);
@@ -34,7 +34,7 @@ describe('фильтры синхронизации', () => {
     expect(plugin.matchesIgnore('docs/readme.md')).toBe(false);
   });
 
-  test('allowRemoteItem фильтрует по игнору, расширению и размеру', () => {
+  test('allowRemoteItem filters by ignore rules, extension, and size', () => {
     const plugin = createPlugin({
       settings: {
         ignorePatterns: ['private/**'],

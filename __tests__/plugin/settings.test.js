@@ -6,12 +6,12 @@ const { createPlugin, createMockAdapter } = require('../../tests/testUtils');
 
 const { createEmptyIndex } = helpers;
 
-describe('загрузка настроек и индекс', () => {
+describe('settings loading and index', () => {
   beforeEach(() => {
     jest.useRealTimers();
   });
 
-  test('loadSettings применяет значения из файла и сбрасывает кэш игноров', async () => {
+  test('loadSettings applies saved values and clears ignore cache', async () => {
     const adapter = createMockAdapter();
     const plugin = createPlugin({ adapter });
     plugin.loadData = jest.fn().mockResolvedValue({
@@ -26,7 +26,7 @@ describe('загрузка настроек и индекс', () => {
     expect(plugin.invalidateIgnoreCache).toHaveBeenCalled();
   });
 
-  test('loadSettings переносит доп. данные и обновляет indexMeta', async () => {
+  test('loadSettings carries extra data and updates indexMeta', async () => {
     const adapter = createMockAdapter();
     const plugin = createPlugin({ adapter });
     plugin.loadData = jest.fn().mockResolvedValue({
@@ -48,7 +48,7 @@ describe('загрузка настроек и индекс', () => {
     }));
   });
 
-  test('loadSettings пересоздает индекс, если файла нет', async () => {
+  test('loadSettings recreates index when file is missing', async () => {
     const adapter = createMockAdapter();
     const plugin = createPlugin({ adapter });
     const empty = createEmptyIndex();
@@ -65,7 +65,7 @@ describe('загрузка настроек и индекс', () => {
     expect(plugin.indexMeta.hash).toBe('rehash');
   });
 
-  test('ensureIndexDir создает директорию только однажды', async () => {
+  test('ensureIndexDir creates directory only once', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockResolvedValueOnce(false).mockResolvedValue(true);
     const plugin = createPlugin({ adapter });
@@ -76,17 +76,17 @@ describe('загрузка настроек и индекс', () => {
     expect(adapter.mkdir).toHaveBeenCalledTimes(1);
   });
 
-  test('ensureIndexDir логирует ошибку адаптера', async () => {
+  test('ensureIndexDir logs adapter error', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockRejectedValueOnce(new Error('fail'));
     const plugin = createPlugin({ adapter });
 
     await plugin.ensureIndexDir();
 
-    expect(plugin.logWarn).toHaveBeenCalledWith(expect.stringContaining('Не удалось создать директорию индекса'));
+    expect(plugin.logWarn).toHaveBeenCalledWith(expect.stringContaining('Failed to create index directory'));
   });
 
-  test('indexFileExists обновляет кеш', async () => {
+  test('indexFileExists updates cache', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockResolvedValueOnce(true);
     const plugin = createPlugin({ adapter });
@@ -97,7 +97,7 @@ describe('загрузка настроек и индекс', () => {
     expect(plugin._indexFileKnownExists).toBe(true);
   });
 
-  test('indexFileExists сбрасывает кеш при ошибке', async () => {
+  test('indexFileExists resets cache on error', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockRejectedValueOnce(new Error('io'));
     const plugin = createPlugin({ adapter });

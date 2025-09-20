@@ -23,14 +23,14 @@ describe('plugin HTTP helper', () => {
     mockRequestUrl.mockReset();
   });
 
-  test('отсутствие токена приводит к ошибке без запроса', async () => {
+  test('missing token triggers error without request', async () => {
     const plugin = createPlugin({ settings: { accessToken: '' } });
 
     await expect(plugin.http('GET', URL)).rejects.toThrow('Not connected');
     expect(mockRequestUrl).not.toHaveBeenCalled();
   });
 
-  test('успешный JSON-запрос добавляет заголовок авторизации', async () => {
+  test('successful JSON request adds authorization header', async () => {
     const response = { status: 200, json: { ok: true } };
     mockRequestUrl.mockResolvedValue(response);
     const plugin = createPlugin();
@@ -48,7 +48,7 @@ describe('plugin HTTP helper', () => {
     });
   });
 
-  test('получение 429 вызывает повтор с ожиданием и обновление статуса', async () => {
+  test('receiving 429 retries with wait and status update', async () => {
     jest.useFakeTimers();
     const plugin = createPlugin();
     mockRequestUrl
@@ -71,7 +71,7 @@ describe('plugin HTTP helper', () => {
     expect(plugin.logWarn).toHaveBeenCalledWith(expect.stringContaining('429'));
   });
 
-  test('статусы из noRetryStatuses не повторяются и приводят к ошибке', async () => {
+  test('statuses listed in noRetryStatuses are not retried and raise an error', async () => {
     const err = new Error('Forbidden');
     err.status = 403;
     err.text = 'Forbidden';
@@ -83,7 +83,7 @@ describe('plugin HTTP helper', () => {
     expect(plugin.lastHttpError).toBe('HTTP 403: Forbidden');
   });
 
-  test('исчерпание попыток повторов приводит к ошибке и логированию', async () => {
+  test('exhausting retry attempts raises error and logs', async () => {
     jest.useFakeTimers();
     const err = new Error('Boom');
     err.status = 500;
@@ -110,7 +110,7 @@ describe('plugin HTTP helper', () => {
     expect(plugin.lastHttpError).toBe('HTTP 500: Server blew up');
   });
 
-  test('бинарный ответ возвращает arrayBuffer без парсинга', async () => {
+  test('binary response returns arrayBuffer without parsing', async () => {
     const buffer = Buffer.from('abc');
     mockRequestUrl.mockResolvedValue({ status: 200, arrayBuffer: buffer });
     const plugin = createPlugin();

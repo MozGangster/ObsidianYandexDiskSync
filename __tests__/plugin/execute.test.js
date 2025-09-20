@@ -26,7 +26,7 @@ describe('executePlan', () => {
     return plugin;
   }
 
-  test('после upload пересчитывает индекс и сохраняет настройки', async () => {
+  test('recomputes index and saves settings after upload', async () => {
     const plugin = makePlugin();
     const tfile = makeTFile('note.md');
     const plan = [{ type: 'upload', rel: 'note.md', from: { tfile, mtime: 2000, size: 10 }, toAbs: 'disk:/Remote/note.md' }];
@@ -56,7 +56,7 @@ describe('executePlan', () => {
     expect(plugin.saveSettings).toHaveBeenCalled();
   });
 
-  test('использует переданный remoteMap без повторного запроса', async () => {
+  test('uses provided remoteMap without re-fetching', async () => {
     const plugin = makePlugin();
     const tfile = makeTFile('note2.md');
     const plan = [];
@@ -79,7 +79,7 @@ describe('executePlan', () => {
     });
   });
 
-  test('обрабатывает локальные и удалённые удаления', async () => {
+  test('handles local and remote deletions', async () => {
     const plugin = makePlugin();
     const tfile = makeTFile('old.md');
     const plan = [
