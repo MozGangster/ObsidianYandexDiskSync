@@ -10,8 +10,7 @@ const INDEX_FILE_VERSION = 1;
 const I18N = {
   en: {
     'desc.clientId': 'Yandex OAuth Client ID (required for Connect)',
-    'desc.accessToken': 'Paste token manually or use Connect below. Stored in plugin data.',
-    'desc.oauthControls': 'Connect: open OAuth in the browser and paste the token; Disconnect: remove the locally stored token.',
+    'desc.accessToken': 'Paste token manually. Value saves automatically. Use Open OAuth token page to launch the OAuth flow. Stored in plugin data.',
     'desc.oauthBaseUrl': 'Used for authorization and portal links',
     'desc.oauthScopes': 'Leave empty to use scopes configured for your Yandex app. For app-folder only, keep this empty to avoid invalid_scope.',
     'desc.remoteBase': "Root on Yandex.Disk. For app-folder tokens, use 'app:/' (recommended). The vault will sync into the subfolder below.",
@@ -33,8 +32,7 @@ const I18N = {
   },
   ru: {
     'desc.clientId': 'ID клиента Яндекс OAuth (нужен для подключения)',
-    'desc.accessToken': 'Вставьте токен вручную или используйте Connect ниже. Хранится в данных плагина.',
-    'desc.oauthControls': 'Connect: открыть OAuth в браузере и затем вставить токен; Disconnect: удалить локально сохранённый токен.',
+    'desc.accessToken': 'Вставьте токен вручную — значение сохраняется автоматически. Кнопка Open OAuth token page откроет страницу OAuth. Значение хранится в данных плагина.',
     'desc.oauthBaseUrl': 'Используется для авторизации и ссылок портала',
     'desc.oauthScopes': 'Оставьте пустым, чтобы использовать права, настроенные у вашего приложения. Для режима «папка приложения» оставьте пустым, иначе будет invalid_scope.',
     'desc.remoteBase': "Корневая папка на Яндекс.Диске. Для токенов с доступом к папке приложения используйте 'app:/' (рекомендуется). Вольт будет синхронизироваться в подпапку ниже.",
@@ -306,6 +304,25 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName('OAuth base URL')
+      .setDesc(this.plugin.t('desc.oauthBaseUrl'))
+      .addText((txt) =>
+        txt
+          .setPlaceholder(DEFAULT_SETTINGS.oauthBaseUrl)
+          .setValue(this.plugin.settings.oauthBaseUrl)
+          .onChange(async (v) => {
+            const val = (v || '').trim() || DEFAULT_SETTINGS.oauthBaseUrl;
+            this.plugin.settings.oauthBaseUrl = val;
+            await this.plugin.saveSettings();
+          }),
+      )
+      .addButton((b) =>
+        b
+          .setButtonText('Open OAuth portal page')
+          .onClick(() => this.plugin.openOAuthManagement()),
+      );
+
+    new Setting(containerEl)
       .setName('Client ID')
       .setDesc(this.plugin.t('desc.clientId'))
       .addText((txt) =>
@@ -319,57 +336,29 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
       )
       .addButton((b) =>
         b
-          .setButtonText('Manage on Yandex')
+          .setButtonText('Open OAuth portal page')
           .onClick(() => this.plugin.openOAuthManagement()),
       );
 
-    const tokenSetting = new Setting(containerEl)
-      .setName('Access token')
-      .setDesc(this.plugin.t('desc.accessToken'))
-      .addText((txt) =>
-        txt
-          .setPlaceholder('(paste access token)')
-          .setValue(this.plugin.settings.accessToken || '')
-          .onChange(async (v) => {
-            this.plugin.settings.accessToken = (v || '').trim();
-            await this.plugin.saveSettings();
-          }),
-      );
+    const defaultTokenDesc = this.plugin.t('desc.accessToken');
+    const tokenSetting = new Setting(containerEl).setName('Access token').setDesc(defaultTokenDesc);
 
-    const connect = new Setting(containerEl)
-      .setName('OAuth')
-      .setDesc(this.plugin.t('desc.oauthControls'))
-      .addButton((b) =>
-        b.setButtonText('Connect').onClick(() => this.plugin.startOAuthFlow()),
-      )
-      .addButton((b) =>
-        b
-          .setButtonText('Disconnect')
-          .onClick(async () => {
-            this.plugin.settings.accessToken = '';
-            await this.plugin.saveSettings();
-            new Notice('Disconnected');
-            tokenSetting.setDesc(this.plugin.t('desc.accessToken'));
-            this.display();
-          }),
-      );
+    tokenSetting.addText((txt) => {
+      txt
+        .setPlaceholder('(paste access token)')
+        .setValue(this.plugin.settings.accessToken || '')
+        .onChange(async (v) => {
+          const value = (v || '').trim();
+          this.plugin.settings.accessToken = value;
+          await this.plugin.saveSettings();
+        });
+    });
 
-    new Setting(containerEl)
-      .setName('OAuth base URL')
-      .setDesc(this.plugin.t('desc.oauthBaseUrl'))
-      .addText((txt) =>
-        txt
-          .setPlaceholder(DEFAULT_SETTINGS.oauthBaseUrl)
-          .setValue(this.plugin.settings.oauthBaseUrl)
-          .onChange(async (v) => {
-            const val = (v || '').trim() || DEFAULT_SETTINGS.oauthBaseUrl;
-            this.plugin.settings.oauthBaseUrl = val;
-            await this.plugin.saveSettings();
-          }),
-      )
-      .addButton((b) => b.setButtonText('Open portal').onClick(() => this.plugin.openOAuthManagement()));
-
-    
+    tokenSetting.addButton((b) =>
+      b
+        .setButtonText('Open OAuth token page')
+        .onClick(() => this.plugin.startOAuthFlow()),
+    );
 
     new Setting(containerEl)
       .setName('OAuth scopes (optional)')
@@ -1162,31 +1151,7 @@ class YandexDiskSyncPlugin extends Plugin {
     } catch (_) {
       window.open(url, '_blank');
     }
-    const modal = new Modal(this.app);
-    modal.titleEl.setText('Paste Yandex OAuth token');
-    const desc = modal.contentEl.createEl('div');
-    desc.createEl('p', { text: 'A browser window opened for Yandex OAuth. After granting access, copy the access_token value from the URL and paste it here.' });
-    let token = '';
-    new Setting(modal.contentEl).setName('Access token').addText((t) => t.onChange((v) => (token = v.trim())));
-    new Setting(modal.contentEl)
-      .addButton((b) =>
-        b.setButtonText('Save').onClick(async () => {
-          if (!token) {
-            new Notice('Token is empty');
-            return;
-          }
-          this.settings.accessToken = token;
-          await this.saveSettings();
-          new Notice('Connected to Yandex Disk');
-          // Verify token and log result (non-blocking)
-          this.verifyToken(true).catch(() => {});
-          // Refresh settings UI if open
-          try { this.settingTab?.display(); } catch (_) {}
-          modal.close();
-        }),
-      )
-      .addButton((b) => b.setButtonText('Cancel').onClick(() => modal.close()));
-    modal.open();
+    new Notice('Browser opened. Authorize the app, then copy access_token from the URL into Access token.');
   }
 
   openOAuthManagement() {
