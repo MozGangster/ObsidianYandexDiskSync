@@ -1,4 +1,4 @@
-const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder } = require('obsidian');
+const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder, normalizePath } = require('obsidian');
 const crypto = require('crypto');
 
 const PLUGIN_ID = 'yandex-disk-sync';
@@ -151,7 +151,9 @@ function globToRegExp(glob) {
 }
 
 function pathJoin(...parts) {
-  return parts.filter(Boolean).join('/').replace(/\\/g, '/');
+  const filtered = parts.filter(Boolean);
+  if (!filtered.length) return '';
+  return normalizePath(filtered.join('/'));
 }
 
 function createEmptyIndex() {
@@ -191,7 +193,8 @@ function getExt(name) {
 }
 
 function normalizeRelPath(rel) {
-  return rel.replace(/^\/+/, '').replace(/\\/g, '/');
+  if (!rel) return '';
+  return normalizePath(`${rel}`).replace(/^\/+/, '');
 }
 
 class DiagnosticsModal extends Modal {

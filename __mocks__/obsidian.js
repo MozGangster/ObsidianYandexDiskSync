@@ -138,9 +138,26 @@ function createEl() {
   };
 }
 
-async function requestUrl() {
-  return Promise.reject(new Error('requestUrl mock: not implemented'));
+let requestHandler = async () => {
+  throw new Error('requestUrl mock: not implemented');
+};
+
+async function requestUrl(...args) {
+  return requestHandler(...args);
 }
+
+requestUrl.__setMock = (fn) => {
+  requestHandler = typeof fn === 'function' ? fn : requestHandler;
+};
+
+const normalizePath = jest.fn((input) => {
+  if (!input) return '';
+  const str = `${input}`;
+  return str
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+    .replace(/^\.\/+/, '');
+});
 
 module.exports = {
   Plugin,
@@ -151,4 +168,5 @@ module.exports = {
   TFile,
   TFolder,
   requestUrl,
+  normalizePath,
 };
