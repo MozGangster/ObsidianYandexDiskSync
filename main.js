@@ -1,7 +1,10 @@
 const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder } = require('obsidian');
+const crypto = require('crypto');
 
 const PLUGIN_ID = 'yandex-disk-sync';
 const API_BASE = 'https://cloud-api.yandex.net/v1/disk';
+const INDEX_FILE_NAME = 'index.json';
+const INDEX_FILE_VERSION = 1;
 
 // Simple i18n dictionary for field descriptions only
 const I18N = {
@@ -118,6 +121,37 @@ function globToRegExp(glob) {
 
 function pathJoin(...parts) {
   return parts.filter(Boolean).join('/').replace(/\\/g, '/');
+}
+
+function createEmptyIndex() {
+  return { files: {}, lastSyncAt: null };
+}
+
+function sanitizeIndexForHash(index) {
+  const safe = index && typeof index === 'object' ? index : {};
+  const lastSyncAt = typeof safe.lastSyncAt === 'string' ? safe.lastSyncAt : null;
+  const files = {};
+  const source = safe.files && typeof safe.files === 'object' ? safe.files : {};
+  for (const rel of Object.keys(source).sort()) {
+    const entry = source[rel];
+    if (!entry || typeof entry !== 'object') continue;
+    const sortedEntry = {};
+    for (const key of Object.keys(entry).sort()) {
+      sortedEntry[key] = entry[key];
+    }
+    files[rel] = sortedEntry;
+  }
+  return { lastSyncAt, files };
+}
+
+function computeIndexHash(index) {
+  try {
+    const normalized = sanitizeIndexForHash(index || {});
+    const json = JSON.stringify(normalized);
+    return crypto.createHash('sha1').update(json).digest('hex');
+  } catch (_) {
+    return null;
+  }
 }
 
 function getExt(name) {
@@ -591,7 +625,12 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
 class YandexDiskSyncPlugin extends Plugin {
   async onload() {
     this.log = [];
-    this.index = { files: {}, lastSyncAt: null };
+    this.index = createEmptyIndex();
+    this.indexMeta = { hash: null, version: INDEX_FILE_VERSION };
+    this.indexHash = null;
+    this._indexDirEnsured = false;
+    this._indexFileKnownExists = false;
+    this._persistedExtra = {};
     this.currentRun = null;
     this.statusBar = null;
 
@@ -670,12 +709,164 @@ class YandexDiskSyncPlugin extends Plugin {
   async loadSettings() {
     const data = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings || {});
-    this.index = data?.index || { files: {}, lastSyncAt: null };
+
+    this._persistedExtra = {};
+    if (data && typeof data === 'object') {
+      for (const key of Object.keys(data)) {
+        if (key === 'settings' || key === 'index' || key === 'indexMeta') continue;
+        this._persistedExtra[key] = data[key];
+      }
+    }
+
+    const storedMeta = data && typeof data.indexMeta === 'object' ? data.indexMeta : null;
+    const { index, hash, existed } = await this.readIndexFile();
+    this.index = index;
+    this.indexHash = hash || computeIndexHash(index);
+    this.indexMeta = { hash: this.indexHash, version: INDEX_FILE_VERSION };
+    if (!existed) {
+      try {
+        const rebuiltHash = await this.writeIndexFile(this.index);
+        this.indexHash = rebuiltHash;
+        this.indexMeta.hash = rebuiltHash;
+      } catch (e) {
+        this.logWarn(`Не удалось создать файл индекса: ${e?.message || e}`);
+      }
+    }
+
+    if ((storedMeta && storedMeta.hash) !== this.indexMeta.hash) {
+      try {
+        await this.saveData(Object.assign({}, this._persistedExtra, { settings: this.settings, indexMeta: this.indexMeta }));
+      } catch (e) {
+        this.logWarn(`Не удалось обновить данные настроек: ${e?.message || e}`);
+      }
+    }
+
     this.invalidateIgnoreCache();
   }
 
   async saveSettings() {
-    await this.saveData({ settings: this.settings, index: this.index });
+    await this.persistIndexIfNeeded(false);
+    try {
+      await this.saveData(Object.assign({}, this._persistedExtra, { settings: this.settings, indexMeta: this.indexMeta }));
+    } catch (e) {
+      this.logWarn(`Не удалось сохранить настройки: ${e?.message || e}`);
+    }
+  }
+
+  getPluginDataDir() {
+    const configDir = this.app?.vault?.configDir || '.obsidian';
+    const pluginId = this.manifest?.id || PLUGIN_ID;
+    return pathJoin(configDir, 'plugins', pluginId);
+  }
+
+  getIndexFilePath() {
+    return pathJoin(this.getPluginDataDir(), INDEX_FILE_NAME);
+  }
+
+  async ensureIndexDir() {
+    if (this._indexDirEnsured) return;
+    try {
+      const adapter = this.app?.vault?.adapter;
+      if (!adapter) return;
+      const dir = this.getPluginDataDir();
+      if (!(await adapter.exists(dir))) await adapter.mkdir(dir);
+      this._indexDirEnsured = true;
+    } catch (e) {
+      this.logWarn(`Не удалось создать директорию индекса: ${e?.message || e}`);
+    }
+  }
+
+  async indexFileExists() {
+    try {
+      const adapter = this.app?.vault?.adapter;
+      if (!adapter) return false;
+      const exists = await adapter.exists(this.getIndexFilePath());
+      this._indexFileKnownExists = exists;
+      return exists;
+    } catch (e) {
+      this._indexFileKnownExists = false;
+      return false;
+    }
+  }
+
+  async readIndexFile() {
+    const adapter = this.app?.vault?.adapter;
+    if (!adapter) {
+      const empty = createEmptyIndex();
+      return { index: empty, hash: computeIndexHash(empty), existed: false };
+    }
+    try {
+      const filePath = this.getIndexFilePath();
+      const exists = await adapter.exists(filePath);
+      if (!exists) {
+        this._indexFileKnownExists = false;
+        const empty = createEmptyIndex();
+        return { index: empty, hash: computeIndexHash(empty), existed: false };
+      }
+      const raw = await adapter.read(filePath);
+      let parsed = {};
+      if (raw && raw.trim().length) {
+        try { parsed = JSON.parse(raw); }
+        catch (err) {
+          this.logWarn(`Индекс повреждён, будет восстановлен: ${err?.message || err}`);
+          parsed = {};
+        }
+      }
+      const body = parsed && typeof parsed === 'object' ? parsed : {};
+      const filesSource = body.files && typeof body.files === 'object' ? body.files : {};
+      const files = {};
+      for (const key of Object.keys(filesSource)) files[key] = filesSource[key];
+      const lastSyncAt = typeof body.lastSyncAt === 'string' ? body.lastSyncAt : null;
+      const index = { files, lastSyncAt };
+      const hash = computeIndexHash(index);
+      this._indexFileKnownExists = true;
+      return { index, hash, existed: true };
+    } catch (e) {
+      this._indexFileKnownExists = false;
+      this.logWarn(`Не удалось прочитать файл индекса: ${e?.message || e}`);
+      return { index: createEmptyIndex(), hash: null, existed: false };
+    }
+  }
+
+  async writeIndexFile(index) {
+    const adapter = this.app?.vault?.adapter;
+    if (!adapter) throw new Error('Vault adapter недоступен');
+    await this.ensureIndexDir();
+    const filesSource = index.files && typeof index.files === 'object' ? index.files : {};
+    const files = {};
+    for (const key of Object.keys(filesSource)) files[key] = filesSource[key];
+    const payload = {
+      version: INDEX_FILE_VERSION,
+      lastSyncAt: typeof index.lastSyncAt === 'string' ? index.lastSyncAt : null,
+      files,
+    };
+    await adapter.write(this.getIndexFilePath(), JSON.stringify(payload));
+    this._indexFileKnownExists = true;
+    return computeIndexHash(payload);
+  }
+
+  async persistIndexIfNeeded(force = false) {
+    const current = this.index && typeof this.index === 'object' ? this.index : createEmptyIndex();
+    const newHash = computeIndexHash(current);
+    let needWrite = force || !this.indexHash || this.indexHash !== newHash;
+    if (!needWrite) {
+      if (!this._indexFileKnownExists) {
+        const exists = await this.indexFileExists();
+        needWrite = !exists;
+      }
+    }
+    if (needWrite) {
+      try {
+        const writtenHash = await this.writeIndexFile(current);
+        this.indexHash = writtenHash;
+        this.indexMeta = { hash: writtenHash, version: INDEX_FILE_VERSION };
+        return;
+      } catch (e) {
+        this.logWarn(`Не удалось обновить файл индекса: ${e?.message || e}`);
+      }
+    }
+    this.indexHash = newHash;
+    this.indexMeta = { hash: newHash, version: INDEX_FILE_VERSION };
   }
 
   initStatusBar() {
