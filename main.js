@@ -78,7 +78,6 @@ const DEFAULT_SETTINGS = {
   remoteBasePath: 'app:/',
   // Filters
   ignorePatterns: ['.obsidian/**', '**/.trash/**'],
-  binaryExtensions: ['png', 'jpg', 'jpeg', 'gif', 'pdf', 'zip'],
   excludeExtensions: [],
   maxSizeMB: 200,
   // Policies
@@ -114,6 +113,30 @@ function nowIso() {
 
 function delay(ms) {
   return new Promise((res) => setTimeout(res, ms));
+}
+
+async function copyTextToClipboard(text, successMessage, failureMessage) {
+  const value = text || '';
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    new Notice(successMessage);
+    return true;
+  } catch (_) {
+    new Notice(failureMessage);
+    return false;
+  }
 }
 
 // Convert a simple glob (supports **, *, ?) to RegExp. Escapes regex meta as needed.
@@ -192,27 +215,8 @@ class DiagnosticsModal extends Modal {
 
     const toolbar = contentEl.createEl('div', { cls: 'yds-modal-toolbar' });
     const copyBtn = toolbar.createEl('button', { text: 'Copy all' });
-    copyBtn.addEventListener('click', async () => {
-      const txt = this.text || '';
-      try {
-        if (navigator?.clipboard?.writeText) {
-          await navigator.clipboard.writeText(txt);
-        } else {
-          // Fallback
-          const ta = document.createElement('textarea');
-          ta.value = txt;
-          ta.style.position = 'fixed';
-          ta.style.opacity = '0';
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-        }
-        new Notice('Diagnostics copied to clipboard');
-      } catch (_) {
-        new Notice('Copy failed');
-      }
+    copyBtn.addEventListener('click', () => {
+      copyTextToClipboard(this.text || '', 'Diagnostics copied to clipboard', 'Copy failed');
     });
 
     const pre = (this.preEl = contentEl.createEl('pre', { cls: 'yds-modal-pre' }));
@@ -250,26 +254,8 @@ class ProgressModal extends Modal {
     };
 
     const copyBtn = toolbar.createEl('button', { text: 'Copy all' });
-    copyBtn.onclick = async () => {
-      const txt = this.plugin.getProgressSummary();
-      try {
-        if (navigator?.clipboard?.writeText) {
-          await navigator.clipboard.writeText(txt);
-        } else {
-          const ta = document.createElement('textarea');
-          ta.value = txt;
-          ta.style.position = 'fixed';
-          ta.style.opacity = '0';
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-        }
-        new Notice('Progress copied to clipboard');
-      } catch (_) {
-        new Notice('Copy failed');
-      }
+    copyBtn.onclick = () => {
+      copyTextToClipboard(this.plugin.getProgressSummary(), 'Progress copied to clipboard', 'Copy failed');
     };
 
     const cancelBtn = toolbar.createEl('button', { text: 'Cancel' });
@@ -1003,7 +989,7 @@ class YandexDiskSyncPlugin extends Plugin {
     r.done += ok ? 1 : 0;
     r.failed += ok ? 0 : 1;
     r.queued = Math.max(0, r.queued - 1);
-    const bucket = op.type === 'upload' ? 'upload' : op.type === 'download' ? 'download' : 'del';
+    const bucket = op.type === 'upload' ? 'upload' : op.type === 'download' ? 'download' : op.type === 'conflict' ? 'conflict' : 'del';
     if (r.counts[bucket]) {
       r.counts[bucket].done += ok ? 1 : 0;
       r.counts[bucket].queued = Math.max(0, r.counts[bucket].queued - 1);
@@ -1018,10 +1004,20 @@ class YandexDiskSyncPlugin extends Plugin {
     const r = this.currentRun;
     if (!r) return 'No active sync.';
     const elapsed = ((Date.now() - r.startAt) / 1000).toFixed(1);
+    const uploadTotal = r.counts.upload.done + r.counts.upload.queued;
+    const downloadTotal = r.counts.download.done + r.counts.download.queued;
+    const deleteTotal = r.counts.del.done + r.counts.del.queued;
+    const conflictTotal = r.counts.conflict.done + r.counts.conflict.queued;
+    const countsLineParts = [
+      `Uploads: ${r.counts.upload.done}/${uploadTotal}`,
+      `Downloads: ${r.counts.download.done}/${downloadTotal}`,
+      `Deletes: ${r.counts.del.done}/${deleteTotal}`,
+    ];
+    if (conflictTotal) countsLineParts.push(`Conflicts: ${r.counts.conflict.done}/${conflictTotal}`);
     const header = [
       `Phase: ${r.phase}${r.canceled ? ' (cancelling...)' : ''}`,
       `Progress: ${r.done}/${r.total} (failed ${r.failed}, queued ${r.queued})`,
-      `Uploads: ${r.counts.upload.done}/${r.counts.upload.done + r.counts.upload.queued}  Downloads: ${r.counts.download.done}/${r.counts.download.done + r.counts.download.queued}  Deletes: ${r.counts.del.done}/${r.counts.del.done + r.counts.del.queued}`,
+      countsLineParts.join('  '),
       `Elapsed: ${elapsed}s`,
       '',
       'Recent ops:',
@@ -1117,7 +1113,7 @@ class YandexDiskSyncPlugin extends Plugin {
   onLocalEvent(type, file, oldPath) {
     if (!(file?.path)) return;
     const rel = this.toLocalRel(file.path);
-    if (!this.inScope(rel) || this.matchesIgnore(rel)) return;
+    if (!this.inScope(rel, file.path) || this.matchesIgnore(rel)) return;
     this.logInfo(`Local event: ${type} ${rel}${oldPath ? ` (from ${oldPath})` : ''}`);
     // We keep it simple: no immediate sync; rely on manual/auto timer.
   }
@@ -1207,16 +1203,35 @@ class YandexDiskSyncPlugin extends Plugin {
     const base = this.settings.localBasePath ? normalizeRelPath(this.settings.localBasePath) + '/' : '';
     return normalizeRelPath(base + rel);
   }
-  inScope(rel) {
+  inScope(rel, fullPath) {
     if (!this.settings.localBasePath) return true;
-    // If localBasePath is set, only include within that subtree.
-    return this.fromLocalRel(rel).startsWith(this.settings.localBasePath);
+    const base = normalizeRelPath(this.settings.localBasePath);
+    if (!base) return true;
+    const candidateSource = fullPath != null ? fullPath : rel != null ? rel : '';
+    const candidate = normalizeRelPath(candidateSource);
+    if (!candidate) return false;
+    if (candidate === base) return true;
+    return candidate.startsWith(`${base}/`);
   }
   matchesIgnore(rel) {
     if (!this._ignoreCache) {
       this._ignoreCache = this.settings.ignorePatterns.map(globToRegExp);
     }
     return this._ignoreCache.some((re) => re.test(rel));
+  }
+
+  allowRemoteItem(item) {
+    const relPath = item?.rel || '';
+    if (this.matchesIgnore(relPath)) return false;
+    const ext = getExt(relPath);
+    const excludedExts = Array.isArray(this.settings.excludeExtensions) ? this.settings.excludeExtensions : [];
+    if (excludedExts.includes(ext)) return false;
+    const limitMb = Number(this.settings.maxSizeMB) || 0;
+    if (limitMb > 0) {
+      const sizeLimit = limitMb * 1024 * 1024;
+      if (Number(item?.size) > sizeLimit) return false;
+    }
+    return true;
   }
 
   invalidateIgnoreCache() {
@@ -1388,13 +1403,12 @@ class YandexDiskSyncPlugin extends Plugin {
 
   // Local scanning
   listLocalFilesInScope() {
-    const base = normalizeRelPath(this.settings.localBasePath || '');
     const out = [];
     const all = this.app.vault.getAllLoadedFiles();
     for (const f of all) {
       if (f instanceof TFolder) continue; // folders
       const rel = this.toLocalRel(f.path);
-      if (!this.inScope(rel)) continue;
+      if (!this.inScope(rel, f.path)) continue;
       if (this.matchesIgnore(rel)) continue;
       const ext = getExt(rel);
       if (this.settings.excludeExtensions.includes(ext)) continue;
@@ -1410,13 +1424,12 @@ class YandexDiskSyncPlugin extends Plugin {
     const local = this.listLocalFilesInScope();
     const remoteBase = this.getRemoteBase();
     await this.ydEnsureFolder(remoteBase || '/');
-    const remote = await this.ydListFolderRecursive(remoteBase || '/');
+    const remoteListing = await this.ydListFolderRecursive(remoteBase || '/');
+    const remote = remoteListing.filter((item) => this.allowRemoteItem(item));
 
     const localMap = new Map(local.map((x) => [x.rel, x]));
     const remoteMap = new Map(remote.map((x) => [x.rel, x]));
     const plan = [];
-
-    const lastSync = this.index.lastSyncAt ? new Date(this.index.lastSyncAt).getTime() : 0;
 
     // Consider both directions
     const rels = new Set([...localMap.keys(), ...remoteMap.keys()]);
@@ -1424,7 +1437,6 @@ class YandexDiskSyncPlugin extends Plugin {
       const loc = localMap.get(rel);
       const rem = remoteMap.get(rel);
       const idx = this.index.files[rel];
-      const isMd = getExt(rel) === 'md';
       const canUpload = this.settings.syncMode !== 'download';
       const canDownload = this.settings.syncMode !== 'upload';
 
@@ -1505,7 +1517,7 @@ class YandexDiskSyncPlugin extends Plugin {
     }
     const finalPlan = Array.from(byRel.values());
 
-    return { plan: finalPlan, localMap, remoteMap };
+    return { plan: finalPlan, remoteMap };
   }
 
   async syncNow(dryRun = false) {
@@ -1521,7 +1533,7 @@ class YandexDiskSyncPlugin extends Plugin {
       }
       this.logInfo(`Sync started (dryRun=${dryRun})`);
       this.startRun(dryRun, 0);
-      const { plan, localMap /* remoteMap */ } = await this.buildPlan();
+      const { plan, remoteMap } = await this.buildPlan();
       this.setRunPlan(plan);
       if (dryRun) {
         // Render plan in a safe, readable way without circular refs
@@ -1551,9 +1563,7 @@ class YandexDiskSyncPlugin extends Plugin {
         this.finishRun(true);
         return;
       }
-      await this.executePlan(plan, localMap);
-      this.index.lastSyncAt = nowIso();
-      await this.saveSettings();
+      await this.executePlan(plan, remoteMap);
       new Notice('Sync completed');
       this.finishRun(true);
     } catch (e) {
@@ -1563,7 +1573,7 @@ class YandexDiskSyncPlugin extends Plugin {
     }
   }
 
-  async executePlan(plan, localMap) {
+  async executePlan(plan, remoteMapFromPlan) {
     // Run upload/download with limited concurrency
     const uploads = plan.filter((x) => x.type === 'upload');
     const downloads = plan.filter((x) => x.type === 'download');
@@ -1611,9 +1621,16 @@ class YandexDiskSyncPlugin extends Plugin {
     // Update index
     // Re-scan local state after operations
     const localAfter = this.listLocalFilesInScope();
-    const remoteRoot = this.getRemoteBase();
-    const remoteAfter = await this.ydListFolderRecursive(remoteRoot || '/');
-    const remoteMap = new Map(remoteAfter.map((x) => [x.rel, x]));
+    const remoteChanged = uploads.length > 0 || rDeletes.length > 0;
+    let remoteAfter;
+    if (remoteChanged || !remoteMapFromPlan) {
+      const remoteRoot = this.getRemoteBase();
+      remoteAfter = await this.ydListFolderRecursive(remoteRoot || '/');
+    } else {
+      remoteAfter = Array.from(remoteMapFromPlan.values());
+    }
+    const filteredRemoteAfter = (remoteAfter || []).filter((item) => this.allowRemoteItem(item));
+    const remoteMap = new Map(filteredRemoteAfter.map((x) => [x.rel, x]));
     const newIndex = {};
     for (const loc of localAfter) {
       const rem = remoteMap.get(loc.rel);
@@ -1625,6 +1642,7 @@ class YandexDiskSyncPlugin extends Plugin {
       };
     }
     this.index.files = newIndex;
+    this.index.lastSyncAt = nowIso();
     await this.saveSettings();
   }
 
@@ -1745,3 +1763,12 @@ class YandexDiskSyncPlugin extends Plugin {
 }
 
 module.exports = YandexDiskSyncPlugin;
+module.exports.helpers = {
+  globToRegExp,
+  pathJoin,
+  createEmptyIndex,
+  sanitizeIndexForHash,
+  computeIndexHash,
+  normalizeRelPath,
+};
+module.exports.DEFAULT_SETTINGS = DEFAULT_SETTINGS;
