@@ -38,23 +38,27 @@ Yandex Disk Sync (плагин Obsidian)
 ![](image_3.png)
 
 Первичная настройка (Settings → Yandex Disk Sync)
-- Client ID: вставьте Client ID.
-- OAuth base URL: oauth.yandex.ru или oauth.yandex.com, в зависимости от аккаунта.
-- OAuth scopes (optional): оставьте пустым — использовать права из настроек приложения (для «папки приложения» обязательно; иначе будет `invalid_scope`).
-- Access Token: нажмите «Connect», дайте доступ, скопируйте `access_token` со страницы и вставьте в модальное окно; либо вставьте уже полученный токен.
-- Remote base folder: корень в облаке (рекомендуется `app:/`).
-- Vault folder name: подпапка внутри Remote base (по умолчанию — имя вашего вольта). Итоговый корень в облаке: `<Remote base>/<Vault folder name>`.
-- Local scope: подпапка в вольте для синхронизации (пусто = весь вольт).
-- Ignore patterns: шаблоны через запятую, напр. `.obsidian/**, **/.trash/**, **/*.tmp`.
-- Sync mode: two‑way | upload | download.
-- Delete policy: mirror (отражать удаления по индексу последней синхронизации) | skip (никогда не удалять).
-- Conflict handling Strategy: newest‑wins (по времени; в пределах допуска — локальная) | duplicate‑both (сохранить обе версии).
-- Time skew tolerance (sec): допуск времени для newest‑wins (типично 120–300).
-- Max file size (MB): пропускать локальные файлы больше этого порога при выгрузке (по умолчанию 200).
-- Concurrency (upload/download): параллельные потоки (рекомендация 1–3 / 1–4).
-- Auto‑sync interval (minutes): 0 — выкл.; работает только пока открыт Obsidian.
-- Sync on startup: запускать синхронизацию при старте; при необходимости укажите Startup delay (sec).
-- Language: язык пояснений (Auto/English/Русский).
+- Language: выберите язык подсказок (Auto/English/Русский).
+- **Обязательные параметры** (группа с таким же заголовком в настройках):
+  - OAuth base URL: `https://oauth.yandex.ru` (для RU‑аккаунтов) или `https://oauth.yandex.com` (международные). Рядом доступна кнопка `Open OAuth portal page`, чтобы открыть портал управления.
+  - Client ID: вставьте скопированный Client ID. Здесь тоже есть кнопка `Open OAuth portal page` для быстрого перехода на портал Яндекса.
+  - Access token: нажмите `Open OAuth token page`, авторизуйтесь в браузере, скопируйте `access_token` из адресной строки и вставьте в поле. Значение сохраняется автоматически; чтобы отключиться, очистите поле.
+- **Дополнительные параметры** (расположены ниже):
+  - OAuth scopes (optional): оставьте пустым, чтобы использовать права из настроек приложения (для режима «папка приложения» это обязательно, иначе будет `invalid_scope`).
+  - Remote base folder: корневая папка в облаке (рекомендуется `app:/`).
+  - Vault folder name: подпапка внутри Remote base (по умолчанию — имя вашего вольта). Итоговый путь: `<Remote base>/<Vault folder name>`.
+  - Local scope: подпапка в вольте для синхронизации (пусто = весь вольт).
+  - Ignore patterns: шаблоны через запятую, напр. `.obsidian/**, **/.trash/**, **/*.tmp`.
+  - Sync mode: two‑way | upload | download.
+  - Delete policy: mirror (отражать удаления по индексу последней синхронизации) | skip (никогда не удалять).
+  - Conflict handling Strategy: newest‑wins (по времени; в пределах допуска — локальная) | duplicate‑both (сохранить обе версии).
+  - Time skew tolerance (sec): допуск времени для newest‑wins (типично 120–300).
+  - Max file size (MB): пропускать локальные файлы больше этого порога при загрузке (по умолчанию 200).
+  - Concurrency (upload/download): число параллельных потоков (рекомендация 1–3 / 1–4).
+  - Auto‑sync interval (minutes): 0 — выкл.; работает только пока открыт Obsidian.
+  - Sync on startup: запускать синхронизацию при старте; при необходимости задайте Startup delay (sec).
+
+Подсказка: открыть портал управления можно из полей OAuth base URL и Client ID кнопкой `Open OAuth portal page`, а повторно получить токен — кнопкой `Open OAuth token page` рядом с полем Access token.
 
 Использование
 - Кнопка на боковой панели (Ribbon): запускает «Sync» (если уже идёт — не запускает второй раз).

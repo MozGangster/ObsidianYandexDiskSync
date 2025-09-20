@@ -42,23 +42,27 @@ OAuth application registration (Client ID)
 ![](Docs/image_3.png)
 
 Initial setup (Settings → Yandex Disk Sync)
-- Client ID: paste the Client ID.
-- OAuth base URL: oauth.yandex.ru or oauth.yandex.com, depending on your account.
-- OAuth scopes (optional): leave empty — use permissions from the app settings (required for “application folder”; otherwise you’ll get `invalid_scope`).
-- Access Token: click “Connect”, grant access, copy the `access_token` from the page and paste it into the modal; or paste an existing token.
-- Remote base folder: root path in the cloud (recommended `app:/`).
-- Vault folder name: subfolder inside Remote base (defaults to your vault name). Effective cloud root: `<Remote base>/<Vault folder name>`.
-- Local scope: subfolder in the vault to sync (empty = entire vault).
-- Ignore patterns: comma‑separated patterns, e.g., `.obsidian/**, **/.trash/**, **/*.tmp`.
-- Sync mode: two‑way | upload | download.
-- Delete policy: mirror (propagate deletions according to the last‑sync index) | skip (never delete).
-- Conflict handling Strategy: newest‑wins (by timestamp; within tolerance — local) | duplicate‑both (keep both versions).
-- Time skew tolerance (sec): allowed time skew for newest‑wins (typically 120–300).
-- Max file size (MB): skip local files larger than this threshold on upload (default 200).
-- Concurrency (upload/download): parallel workers (recommended 1–3 / 1–4).
-- Auto‑sync interval (minutes): 0 — off; works only while Obsidian is open.
-- Sync on startup: start sync on launch; if needed set Startup delay (sec).
-- Language: language of help texts (Auto/English/Русский).
+- Language: pick the language of help texts (Auto/English/Русский).
+- **Required settings** (group labelled the same in the UI):
+  - OAuth base URL: `https://oauth.yandex.ru` (RU accounts) or `https://oauth.yandex.com` (international). Use the nearby `Open OAuth portal page` button if you need to open the management site.
+  - Client ID: paste the Client ID you received when registering the application. The same `Open OAuth portal page` button is available here for quick access to the Yandex portal.
+  - Access token: press `Open OAuth token page`, grant access in the browser, then copy the `access_token` from the redirected URL and paste it into the field. The value is saved automatically; clear the field to disconnect.
+- **Optional settings** (grouped below):
+  - OAuth scopes (optional): leave empty to reuse the application permissions (required for “application folder”; otherwise you’ll get `invalid_scope`).
+  - Remote base folder: root path in the cloud (recommended `app:/`).
+  - Vault folder name: subfolder inside Remote base (defaults to your vault name). Effective cloud root: `<Remote base>/<Vault folder name>`.
+  - Local scope: subfolder in the vault to sync (empty = entire vault).
+  - Ignore patterns: comma‑separated patterns, e.g., `.obsidian/**, **/.trash/**, **/*.tmp`.
+  - Sync mode: two‑way | upload | download.
+  - Delete policy: mirror (propagate deletions according to the last‑sync index) | skip (never delete).
+  - Conflict handling Strategy: newest‑wins (by timestamp; within tolerance — local) | duplicate‑both (keep both versions).
+  - Time skew tolerance (sec): allowed time skew for newest‑wins (typically 120–300).
+  - Max file size (MB): skip local files larger than this threshold on upload (default 200).
+  - Concurrency (upload/download): parallel workers (recommended 1–3 / 1–4).
+  - Auto‑sync interval (minutes): 0 — off; works only while Obsidian is open.
+  - Sync on startup: start sync on launch; if needed set Startup delay (sec).
+
+Tips: you can always reach the OAuth management portal from either required field with the `Open OAuth portal page` button, and re-run the token flow with `Open OAuth token page` next to the Access token field.
 
 Usage
 - Ribbon button: starts “Sync” (if already running, won’t start another).
