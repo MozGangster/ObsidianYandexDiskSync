@@ -37,11 +37,9 @@ describe('buildPlan - advanced scenarios', () => {
     const { plan } = await plugin.buildPlan();
 
     expect(plan).toContainEqual({
-      type: 'download',
+      type: 'remote-delete',
       rel: 'remote.md',
-      fromAbs: 'disk:/Base/remote.md',
-      toRel: 'remote.md',
-      remote,
+      abs: 'disk:/Base/remote.md',
     });
   });
 

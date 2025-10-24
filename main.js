@@ -1525,8 +1525,15 @@ class YandexDiskSyncPlugin extends Plugin {
       }
     }
 
-    // Deduplicate per rel: prefer conflict > upload/download > delete
-    const pri = (t) => (t === 'conflict' ? 3 : (t === 'upload' || t === 'download') ? 2 : 1);
+    // Deduplicate per rel: prefer conflict > delete > transfer
+    // This ensures, for mirror policy, that intentional deletions
+    // are not overridden by a download/upload decision.
+    const pri = (t) => {
+      if (t === 'conflict') return 3;
+      if (t === 'remote-delete' || t === 'local-delete') return 2;
+      if (t === 'upload' || t === 'download') return 1;
+      return 0;
+    };
     const byRel = new Map();
     for (const op of plan) {
       const prev = byRel.get(op.rel);

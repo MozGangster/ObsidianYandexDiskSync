@@ -159,7 +159,7 @@ describe('sync plan', () => {
     expect(plan[0]).toMatchObject({ type: 'download', rel: 'note.md', fromAbs: remote.path });
   });
 
-  test('mirror policy keeps download when local file is missing (deletion suppressed by priority)', async () => {
+  test('mirror policy deletes remote when local file is missing and remote unchanged', async () => {
     const modified = new Date('2024-01-01T00:00:00.000Z').toISOString();
     const modifiedTime = new Date(modified).getTime();
     const remote = makeRemote('archive.md', {
@@ -188,10 +188,10 @@ describe('sync plan', () => {
     const { plan } = await plugin.buildPlan();
 
     expect(plan).toHaveLength(1);
-    expect(plan[0]).toMatchObject({ type: 'download', rel: 'archive.md' });
+    expect(plan[0]).toMatchObject({ type: 'remote-delete', rel: 'archive.md' });
   });
 
-  test('mirror policy keeps upload when remote file was deleted (deletion suppressed by priority)', async () => {
+  test('mirror policy deletes local when remote file was deleted and local unchanged', async () => {
     const plugin = createPlugin({
       index: {
         files: {
@@ -215,6 +215,6 @@ describe('sync plan', () => {
     const { plan } = await plugin.buildPlan();
 
     expect(plan).toHaveLength(1);
-    expect(plan[0]).toMatchObject({ type: 'upload', rel: 'trash.md' });
+    expect(plan[0]).toMatchObject({ type: 'local-delete', rel: 'trash.md' });
   });
 });
