@@ -1,6 +1,6 @@
 {
   "name": "obsidian-yandex-disk-sync",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Tests for the Yandex Disk Sync Obsidian plugin",
   "type": "commonjs",
   "scripts": {

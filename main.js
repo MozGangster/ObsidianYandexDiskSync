@@ -316,11 +316,6 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
             this.plugin.settings.oauthBaseUrl = val;
             await this.plugin.saveSettings();
           }),
-      )
-      .addButton((b) =>
-        b
-          .setButtonText('Open OAuth portal page')
-          .onClick(() => this.plugin.openOAuthManagement()),
       );
 
     new Setting(containerEl)
