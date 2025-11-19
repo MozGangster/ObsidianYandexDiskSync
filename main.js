@@ -1,4 +1,4 @@
-const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder, normalizePath } = require('obsidian');
+const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder, normalizePath, getLanguage } = require('obsidian');
 const crypto = require('crypto');
 
 const PLUGIN_ID = 'yandex-disk-sync';
@@ -103,8 +103,6 @@ const DEFAULT_SETTINGS = {
   // Startup behavior
   syncOnStartup: false,
   syncOnStartupDelaySec: 3,
-  // i18n
-  lang: 'auto', // 'auto' | 'en' | 'ru'
 };
 
 function nowIso() {
@@ -118,19 +116,10 @@ function delay(ms) {
 async function copyTextToClipboard(text, successMessage, failureMessage) {
   const value = text || '';
   try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(value);
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = value;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
+    if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText) {
+      throw new Error('Clipboard API is not available');
     }
+    await navigator.clipboard.writeText(value);
     new Notice(successMessage);
     return true;
   } catch (_) {
@@ -271,6 +260,11 @@ class ProgressModal extends Modal {
     };
     render();
     this._timer = setInterval(render, 500);
+    try {
+      if (this.plugin?.registerInterval) {
+        this.plugin.registerInterval(this._timer);
+      }
+    } catch (_) {}
   }
   onClose() {
     if (this._timer) clearInterval(this._timer);
@@ -286,21 +280,6 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     try { containerEl.addClass('yds-copyable'); } catch (_) {}
-
-    // Language selector at the top
-    new Setting(containerEl)
-      .setName('Language')
-      .setDesc('Language for field descriptions (Auto/English/Русский)')
-      .addDropdown((dd) =>
-        dd
-          .addOptions({ auto: 'Auto', en: 'English', ru: 'Русский' })
-          .setValue(this.plugin.settings.lang || 'auto')
-          .onChange(async (v) => {
-            this.plugin.settings.lang = v;
-            await this.plugin.saveSettings();
-            this.display();
-          }),
-      );
 
     new Setting(containerEl).setName(this.plugin.t('heading.required')).setHeading();
 
@@ -391,7 +370,8 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
           .setPlaceholder('app:/')
           .setValue(this.plugin.settings.remoteBasePath)
           .onChange(async (v) => {
-            this.plugin.settings.remoteBasePath = v.trim() || '/';
+            const raw = (v || '').trim();
+            this.plugin.settings.remoteBasePath = raw ? normalizePath(raw) : '/';
             await this.plugin.saveSettings();
           }),
       );
@@ -405,8 +385,11 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.vaultFolderName || this.plugin.getSuggestedVaultFolderName())
           .onChange(async (v) => {
             let name = (v || '').trim();
-            // Strip slashes and backslashes to keep it as a folder name only
-            name = name.replace(/[\\/]+/g, '');
+            if (name) {
+              name = normalizePath(name);
+              // Strip slashes and backslashes to keep it as a folder name only
+              name = name.replace(/[\\/]+/g, '');
+            }
             if (!name) name = this.plugin.getSuggestedVaultFolderName();
             this.plugin.settings.vaultFolderName = name;
             await this.plugin.saveSettings();
@@ -638,13 +621,6 @@ class YandexDiskSyncPlugin extends Plugin {
     this.settingTab = new YandexDiskSyncSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
 
-    // Ensure settings text (names/descriptions) is selectable/copyable
-    try {
-      this._copyStyleEl = document.createElement('style');
-      this._copyStyleEl.textContent = `.yds-copyable, .yds-copyable * { user-select: text !important; -webkit-user-select: text !important; }`;
-      document.head.appendChild(this._copyStyleEl);
-    } catch (_) {}
-
     this.resetAutoSyncTimer();
 
     if (this.settings.showStatusBar) this.initStatusBar();
@@ -673,20 +649,18 @@ class YandexDiskSyncPlugin extends Plugin {
   }
 
   onunload() {
-    if (this._autoTimer) clearInterval(this._autoTimer);
     try {
       if (this._progressModal) this._progressModal.close();
     } catch (_) {}
     this._progressModal = null;
-    try { this._copyStyleEl?.remove(); } catch (_) {}
   }
 
   getLang() {
-    const pref = this.settings?.lang || 'auto';
-    if (pref === 'en' || pref === 'ru') return pref;
     try {
-      const nav = (typeof navigator !== 'undefined' && navigator.language) ? String(navigator.language).toLowerCase() : '';
-      return nav.startsWith('ru') ? 'ru' : 'en';
+      const apiLang = typeof getLanguage === 'function' ? getLanguage() : 'en';
+      const code = String(apiLang || '').toLowerCase();
+      if (code.startsWith('ru')) return 'ru';
+      return 'en';
     } catch (_) {
       return 'en';
     }
@@ -745,9 +719,10 @@ class YandexDiskSyncPlugin extends Plugin {
   }
 
   getPluginDataDir() {
-    const configDir = this.app?.vault?.configDir || '.obsidian';
     const pluginId = this.manifest?.id || PLUGIN_ID;
-    return pathJoin(configDir, 'plugins', pluginId);
+    const dir = this.manifest?.dir;
+    if (dir) return normalizePath(dir);
+    return pathJoin('.obsidian', 'plugins', pluginId);
   }
 
   getIndexFilePath() {
@@ -1033,6 +1008,11 @@ class YandexDiskSyncPlugin extends Plugin {
     const minutes = this.settings.autoSyncIntervalMin;
     if (minutes > 0) {
       this._autoTimer = setInterval(() => this.syncNow(false).catch(() => {}), minutes * 60 * 1000);
+      try {
+        if (this.registerInterval) {
+          this.registerInterval(this._autoTimer);
+        }
+      } catch (_) {}
     }
   }
 
@@ -1128,7 +1108,9 @@ class YandexDiskSyncPlugin extends Plugin {
   getSuggestedVaultFolderName() {
     try {
       const name = (this.app?.vault?.getName && this.app.vault.getName()) || 'vault';
-      return String(name).replace(/[\\/]+/g, '').trim() || 'vault';
+      const normalized = normalizePath(String(name).trim() || 'vault');
+      const cleaned = normalized.replace(/[\\/]+/g, '');
+      return cleaned || 'vault';
     } catch (_) {
       return 'vault';
     }
@@ -1138,7 +1120,10 @@ class YandexDiskSyncPlugin extends Plugin {
     // Root may be 'app:/', 'disk:/Some', etc. Always append the vault subfolder name.
     let base = (this.settings.remoteBasePath || 'app:/').replace(/\/+$/, '');
     let folder = (this.settings.vaultFolderName || this.getSuggestedVaultFolderName() || 'vault').trim();
-    folder = folder.replace(/[\\/]+/g, '');
+    if (folder) {
+      folder = normalizePath(folder);
+      folder = folder.replace(/[\\/]+/g, '');
+    }
     if (!folder) folder = this.getSuggestedVaultFolderName() || 'vault';
     return `${base}/${folder}`;
   }

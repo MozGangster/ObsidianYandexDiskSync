@@ -5,6 +5,7 @@ class Plugin {
   }
   addCommand() {}
   addSettingTab() {}
+   registerInterval() {}
   addRibbonIcon() {
     return {
       addClass() {},
@@ -159,6 +160,10 @@ const normalizePath = jest.fn((input) => {
     .replace(/^\.\/+/, '');
 });
 
+function getLanguage() {
+  return 'en';
+}
+
 module.exports = {
   Plugin,
   Notice,
@@ -169,4 +174,5 @@ module.exports = {
   TFolder,
   requestUrl,
   normalizePath,
+  getLanguage,
 };
