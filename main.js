@@ -1,7 +1,6 @@
 const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder, normalizePath, getLanguage } = require('obsidian');
 const crypto = require('crypto');
 
-const PLUGIN_ID = 'yandex-disk-sync';
 const API_BASE = 'https://cloud-api.yandex.net/v1/disk';
 const INDEX_FILE_NAME = 'index.json';
 const INDEX_FILE_VERSION = 1;
@@ -29,8 +28,8 @@ const I18N = {
     'desc.maxSize': 'Skip local files larger than this during uploads. Default: 200.',
     'desc.concurrency': 'Parallel transfers (upload/download). High values may cause 429/409; recommended 1–3 / 1–4.',
     'desc.syncOnStartupDelay': 'Delay before startup sync runs (seconds). 0 = no delay.',
-    'heading.required': 'Required settings',
-    'heading.optional': 'Optional settings',
+    'heading.required': 'Required fields',
+    'heading.optional': 'Optional fields',
     'heading.conflict': 'Conflict handling',
     'heading.actions': 'Actions',
     'heading.diagnostics': 'Diagnostics',
@@ -56,8 +55,8 @@ const I18N = {
     'desc.maxSize': 'Пропускать локальные файлы больше этого порога при выгрузке. По умолчанию: 200.',
     'desc.concurrency': 'Параллельные передачи (upload/download). Большие значения могут вызвать 429/409; рекомендация 1–3 / 1–4.',
     'desc.syncOnStartupDelay': 'Задержка перед запуском синхронизации при старте (в секундах). 0 = без задержки.',
-    'heading.required': 'Обязательные параметры',
-    'heading.optional': 'Дополнительные параметры',
+    'heading.required': 'Обязательные',
+    'heading.optional': 'Дополнительные',
     'heading.conflict': 'Разрешение конфликтов',
     'heading.actions': 'Действия',
     'heading.diagnostics': 'Диагностика',
@@ -211,7 +210,7 @@ class DiagnosticsModal extends Modal {
       copyTextToClipboard(this.text || '', 'Diagnostics copied to clipboard', 'Copy failed');
     });
 
-    const pre = (this.preEl = contentEl.createEl('pre', { cls: 'yds-modal-pre' }));
+    this.preEl = contentEl.createEl('pre', { cls: 'yds-modal-pre' });
     pre.setText(this.text);
   }
 }
@@ -221,6 +220,11 @@ class ProgressModal extends Modal {
     super(app);
     this.plugin = plugin;
     this._timer = null;
+  }
+  renderProgress() {
+    if (this.preEl) {
+      this.preEl.setText(this.plugin.getProgressSummary());
+    }
   }
   onOpen() {
     const { contentEl, modalEl, titleEl } = this;
@@ -255,19 +259,18 @@ class ProgressModal extends Modal {
 
     const pre = (this.preEl = contentEl.createEl('pre', { cls: 'yds-modal-pre' }));
 
-    const render = () => {
-      pre.setText(this.plugin.getProgressSummary());
-    };
-    render();
-    this._timer = setInterval(render, 500);
-    try {
-      if (this.plugin?.registerInterval) {
-        this.plugin.registerInterval(this._timer);
-      }
-    } catch (_) {}
+    this.renderProgress();
+    if (!this._timer) {
+      this._timer = setInterval(() => this.renderProgress(), 500);
+      try {
+        if (this.plugin?.registerInterval) {
+          this.plugin.registerInterval(this._timer);
+        }
+      } catch (_) {}
+    }
   }
   onClose() {
-    if (this._timer) clearInterval(this._timer);
+    this.preEl = null;
   }
 }
 
@@ -718,8 +721,12 @@ class YandexDiskSyncPlugin extends Plugin {
     }
   }
 
+  getPluginId() {
+    return this.manifest?.id || 'yandex-disk-sync';
+  }
+
   getPluginDataDir() {
-    const pluginId = this.manifest?.id || PLUGIN_ID;
+    const pluginId = this.getPluginId();
     const dir = this.manifest?.dir;
     if (dir) return normalizePath(dir);
     return pathJoin('.obsidian', 'plugins', pluginId);
@@ -1018,19 +1025,22 @@ class YandexDiskSyncPlugin extends Plugin {
 
   logInfo(msg) {
     const line = `[${nowIso()}] INFO ${msg}`;
-    console.log(`[${PLUGIN_ID}]`, msg);
+    const pluginId = this.getPluginId();
+    console.log(`[${pluginId}]`, msg);
     this.log.push(line);
     if (this.log.length > this.settings.logLimit) this.log.shift();
   }
   logWarn(msg) {
     const line = `[${nowIso()}] WARN ${msg}`;
-    console.warn(`[${PLUGIN_ID}]`, msg);
+    const pluginId = this.getPluginId();
+    console.warn(`[${pluginId}]`, msg);
     this.log.push(line);
     if (this.log.length > this.settings.logLimit) this.log.shift();
   }
   logError(msg) {
     const line = `[${nowIso()}] ERROR ${msg}`;
-    console.error(`[${PLUGIN_ID}]`, msg);
+    const pluginId = this.getPluginId();
+    console.error(`[${pluginId}]`, msg);
     this.log.push(line);
     if (this.log.length > this.settings.logLimit) this.log.shift();
   }
