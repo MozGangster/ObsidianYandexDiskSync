@@ -1755,7 +1755,7 @@ class YandexDiskSyncPlugin extends Plugin {
 
     let buffer;
     if (shouldChunk) {
-      const total = size || 0;
+      let total = size || 0;
       const targetAbs = this.getAbsolutePath(targetPath);
       const tmpAbs = targetAbs ? `${targetAbs}.yds.part` : null;
       const canStream = fsSafe && targetAbs && tmpAbs;
@@ -1776,27 +1776,85 @@ class YandexDiskSyncPlugin extends Plugin {
       }
       while (!total || offset < total) {
         const end = total ? Math.min(total - 1, offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1) : offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1;
+        const requestedSize = end - offset + 1;
+        
         const bin = await this.http('GET', href, { headers: { Range: `bytes=${offset}-${end}` } }, true);
         const arr = new Uint8Array(bin || []);
         if (!arr.length) break;
+
+        // --- SAFEGUARD: Check if server ignored Range and sent full file (or significantly more) ---
+        // If we requested ~2MB but got > 4MB (arbitrary safety margin), or if we got exactly 'total' size when we expected a chunk.
+        // Also if we got the *entire* remaining size in one go when we expected to chunk it.
+        const isWayTooBig = arr.length > requestedSize * 2; 
+        const looksLikeFullFile = total && arr.length === total;
+        
+        if (isWayTooBig || looksLikeFullFile) {
+          this.logWarn(`Range ignored? Requested ${requestedSize} bytes, got ${arr.length}. Assuming full file download.`);
+          
+          // If we already wrote some chunks, this is bad because we now have the FULL file in 'arr'.
+          // We should discard previous chunks and just use this 'arr' as the file content.
+          // But we are in a stream... 
+          
+          if (fd != null) {
+             // If we are streaming, we must reset the file.
+             try { 
+               fsSafe.closeSync(fd); 
+               // Re-open and truncate
+               fd = fsSafe.openSync(tmpAbs, 'w');
+               fsSafe.writeSync(fd, Buffer.from(arr));
+             } catch (e) {
+               this.logWarn(`Failed to rewrite full file in stream mode: ${e}`);
+               throw e; 
+             }
+             got = arr.length;
+             total = arr.length; // Update total to match reality
+             break; // We are done
+          } else {
+             // Memory mode
+             targetBuf = arr;
+             got = arr.length;
+             total = arr.length;
+             break;
+          }
+        }
+
+        // --- SAFEGUARD: Overflow protection ---
+        // If we know the total, don't write past it.
+        let dataToWrite = arr;
+        if (total && got + arr.length > total) {
+           const needed = total - got;
+           if (needed < 0) {
+             // Should not happen if logic is correct, but safety first
+             break; 
+           }
+           this.logWarn(`Received more data than expected (got +${arr.length}, needed ${needed}). Truncating.`);
+           dataToWrite = arr.subarray(0, needed);
+        }
+
         if (fd != null) {
-          try { fsSafe.writeSync(fd, Buffer.from(arr)); }
+          try { fsSafe.writeSync(fd, Buffer.from(dataToWrite)); }
           catch (e) { this.logWarn(`Write chunk failed, switching to memory: ${e?.message || e}`); try { fsSafe.closeSync(fd); } catch (_) {} fd = null; }
         }
+        
         if (targetBuf) {
-          if (got + arr.length > targetBuf.length) {
+          // If we switched to memory or were in memory
+          if (got + dataToWrite.length > targetBuf.length) {
             // Guard against incorrect size; expand as needed.
-            const nb = new Uint8Array(got + arr.length);
+            const nb = new Uint8Array(got + dataToWrite.length);
             nb.set(targetBuf.subarray(0, got), 0);
             targetBuf = nb;
           }
-          targetBuf.set(arr, got);
+          targetBuf.set(dataToWrite, got);
         }
-        got += arr.length;
-        offset += arr.length;
+        
+        got += dataToWrite.length;
+        offset += dataToWrite.length; // Logically advance by what we *kept*
         chunks++;
-        this.logInfo(`Chunk ${chunks}: +${arr.length} bytes (total ${got}${total ? `/${total}` : ''}) for ${toRel}`);
+        this.logInfo(`Chunk ${chunks}: +${dataToWrite.length} bytes (total ${got}${total ? `/${total}` : ''}) for ${toRel}`);
+        
+        // If we didn't get a full chunk, we are probably done
         if (!total && arr.length < MOBILE_DOWNLOAD_CHUNK_BYTES) break;
+        if (total && got >= total) break;
       }
       if (fd != null) {
         try { fsSafe.closeSync(fd); } catch (_) {}
@@ -1811,6 +1869,7 @@ class YandexDiskSyncPlugin extends Plugin {
         this.logInfo(`Downloaded (stream) ${toRel}: ~${Math.round((total || got) / MB)}MB in ${chunks} chunks`);
         // Let vault pick up file; avoid reading full content
         try { await this.app.vault.adapter.stat(targetPath); } catch (_) {}
+        return; // already written to disk
       } else {
         buffer = targetBuf ? targetBuf.subarray(0, got) : new Uint8Array(0);
         this.logInfo(`Downloaded (chunked) ${toRel}: ${Math.round(buffer.length / MB)}MB in ${chunks} chunks`);

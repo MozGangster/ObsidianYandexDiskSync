@@ -3,33 +3,33 @@ class Plugin {
     this.app = app;
     this.manifest = manifest;
   }
-  addCommand() {}
-  addSettingTab() {}
-   registerInterval() {}
+  addCommand() { }
+  addSettingTab() { }
+  registerInterval() { }
   addRibbonIcon() {
     return {
-      addClass() {},
-      setAttribute() {},
+      addClass() { },
+      setAttribute() { },
     };
   }
   addStatusBarItem() {
     return {
-      addClass() {},
-      removeClass() {},
+      addClass() { },
+      removeClass() { },
       classList: {
-        add() {},
-        remove() {},
+        add() { },
+        remove() { },
       },
-      setAttribute() {},
+      setAttribute() { },
     };
   }
-  registerEvent() {}
+  registerEvent() { }
   loadData() { return Promise.resolve({}); }
   saveData() { return Promise.resolve(); }
 }
 
 class Notice {
-  constructor() {}
+  constructor() { }
 }
 
 class Modal {
@@ -39,10 +39,10 @@ class Modal {
     this.modalEl = createEl();
     this.titleEl = createEl();
   }
-  open() {}
-  close() {}
-  onOpen() {}
-  onClose() {}
+  open() { }
+  close() { }
+  onOpen() { }
+  onClose() { }
 }
 
 class Setting {
@@ -105,8 +105,8 @@ class PluginSettingTab {
     this.plugin = plugin;
     this.containerEl = createEl();
   }
-  display() {}
-  hide() {}
+  display() { }
+  hide() { }
 }
 
 class TFile {
@@ -123,18 +123,18 @@ class TFolder {
 
 function createEl() {
   return {
-    empty() {},
-    addClass() {},
-    removeClass() {},
-    appendChild() {},
+    empty() { },
+    addClass() { },
+    removeClass() { },
+    appendChild() { },
     createEl() { return createEl(); },
-    setText() {},
-    setAttr() {},
-    setAttribute() {},
-    addEventListener() {},
+    setText() { },
+    setAttr() { },
+    setAttribute() { },
+    addEventListener() { },
     classList: {
-      add() {},
-      remove() {},
+      add() { },
+      remove() { },
     },
   };
 }
@@ -175,4 +175,11 @@ module.exports = {
   requestUrl,
   normalizePath,
   getLanguage,
+  Platform: {
+    isMobile: false,
+    isMobileApp: false,
+    isDesktop: true,
+    isDesktopApp: true,
+    isSafari: false,
+  },
 };
