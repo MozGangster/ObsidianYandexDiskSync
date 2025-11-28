@@ -1757,7 +1757,8 @@ class YandexDiskSyncPlugin extends Plugin {
     if (shouldChunk) {
       const total = size || 0;
       const targetAbs = this.getAbsolutePath(targetPath);
-      const canStream = fsSafe && targetAbs;
+      const tmpAbs = targetAbs ? `${targetAbs}.yds.part` : null;
+      const canStream = fsSafe && targetAbs && tmpAbs;
       let offset = 0;
       let got = 0;
       let chunks = 0;
@@ -1765,9 +1766,9 @@ class YandexDiskSyncPlugin extends Plugin {
       let fd = null;
       if (canStream) {
         try {
-          const dir = targetAbs.split('/').slice(0, -1).join('/');
+          const dir = tmpAbs.split('/').slice(0, -1).join('/');
           fsSafe.mkdirSync(dir, { recursive: true });
-          fd = fsSafe.openSync(targetAbs, 'w');
+          fd = fsSafe.openSync(tmpAbs, 'w');
         } catch (e) {
           this.logWarn(`Stream init failed, fallback to memory: ${e?.message || e}`);
           fd = null;
@@ -1780,7 +1781,7 @@ class YandexDiskSyncPlugin extends Plugin {
         if (!arr.length) break;
         if (fd != null) {
           try { fsSafe.writeSync(fd, Buffer.from(arr)); }
-          catch (e) { this.logWarn(`Write chunk failed, switching to memory: ${e?.message || e}`); fsSafe.closeSync(fd); fd = null; }
+          catch (e) { this.logWarn(`Write chunk failed, switching to memory: ${e?.message || e}`); try { fsSafe.closeSync(fd); } catch (_) {} fd = null; }
         }
         if (targetBuf) {
           if (got + arr.length > targetBuf.length) {
@@ -1794,18 +1795,22 @@ class YandexDiskSyncPlugin extends Plugin {
         got += arr.length;
         offset += arr.length;
         chunks++;
+        this.logInfo(`Chunk ${chunks}: +${arr.length} bytes (total ${got}${total ? `/${total}` : ''}) for ${toRel}`);
         if (!total && arr.length < MOBILE_DOWNLOAD_CHUNK_BYTES) break;
       }
       if (fd != null) {
         try { fsSafe.closeSync(fd); } catch (_) {}
-        buffer = null;
-        this.logInfo(`Downloaded (chunked->stream) ${toRel}: ${Math.round((total || got) / MB)}MB in ${chunks} chunks`);
-        // Ensure vault sees the file; re-read to buffer minimal (small metadata read)
-        buffer = await this.app.vault.adapter.readBinary(targetPath).catch(() => null);
-        if (!buffer) {
-          // fallback: read from fs
-          try { buffer = fsSafe.readFileSync(targetAbs); } catch (e) { this.logWarn(`Failed to read streamed file: ${e?.message || e}`); buffer = new Uint8Array(0); }
+        try {
+          // Atomic replace: remove old, then rename temp into place
+          try { fsSafe.unlinkSync(targetAbs); } catch (_) {}
+          fsSafe.renameSync(tmpAbs, targetAbs);
+        } catch (e) {
+          this.logWarn(`Rename streamed file failed: ${e?.message || e}`);
         }
+        buffer = null;
+        this.logInfo(`Downloaded (stream) ${toRel}: ~${Math.round((total || got) / MB)}MB in ${chunks} chunks`);
+        // Let vault pick up file; avoid reading full content
+        try { await this.app.vault.adapter.stat(targetPath); } catch (_) {}
       } else {
         buffer = targetBuf ? targetBuf.subarray(0, got) : new Uint8Array(0);
         this.logInfo(`Downloaded (chunked) ${toRel}: ${Math.round(buffer.length / MB)}MB in ${chunks} chunks`);
@@ -1815,7 +1820,9 @@ class YandexDiskSyncPlugin extends Plugin {
       buffer = new Uint8Array(bin || []);
     }
 
-    await this.writeBufferToVault(targetPath, buffer);
+    if (buffer && buffer.length) {
+      await this.writeBufferToVault(targetPath, buffer);
+    }
     this.logInfo(`Downloaded: ${toRel}`);
   }
 
