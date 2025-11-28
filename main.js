@@ -1,5 +1,7 @@
 const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder, normalizePath, getLanguage, Platform } = require('obsidian');
 const crypto = require('crypto');
+let fsSafe = null;
+try { fsSafe = require('fs'); } catch (_) { fsSafe = null; }
 
 const API_BASE = 'https://cloud-api.yandex.net/v1/disk';
 const INDEX_FILE_NAME = 'index.json';
@@ -763,6 +765,17 @@ class YandexDiskSyncPlugin extends Plugin {
     const dir = this.manifest?.dir;
     if (dir) return normalizePath(dir);
     return pathJoin('.obsidian', 'plugins', pluginId);
+  }
+
+  getAbsolutePath(vaultRelPath) {
+    try {
+      const adapter = this.app?.vault?.adapter;
+      const base = adapter?.getBasePath ? adapter.getBasePath() : adapter?.basePath;
+      if (!base) return null;
+      return normalizePath(pathJoin(base, vaultRelPath));
+    } catch (_) {
+      return null;
+    }
   }
 
   getIndexFilePath() {
@@ -1743,23 +1756,60 @@ class YandexDiskSyncPlugin extends Plugin {
     let buffer;
     if (shouldChunk) {
       const total = size || 0;
-      const target = total > 0 ? new Uint8Array(total) : null;
+      const targetAbs = this.getAbsolutePath(targetPath);
+      const canStream = fsSafe && targetAbs;
       let offset = 0;
       let got = 0;
       let chunks = 0;
+      let targetBuf = canStream ? null : (total > 0 ? new Uint8Array(total) : null);
+      let fd = null;
+      if (canStream) {
+        try {
+          const dir = targetAbs.split('/').slice(0, -1).join('/');
+          fsSafe.mkdirSync(dir, { recursive: true });
+          fd = fsSafe.openSync(targetAbs, 'w');
+        } catch (e) {
+          this.logWarn(`Stream init failed, fallback to memory: ${e?.message || e}`);
+          fd = null;
+        }
+      }
       while (!total || offset < total) {
         const end = total ? Math.min(total - 1, offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1) : offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1;
         const bin = await this.http('GET', href, { headers: { Range: `bytes=${offset}-${end}` } }, true);
         const arr = new Uint8Array(bin || []);
         if (!arr.length) break;
-        if (target) target.set(arr, got);
+        if (fd != null) {
+          try { fsSafe.writeSync(fd, Buffer.from(arr)); }
+          catch (e) { this.logWarn(`Write chunk failed, switching to memory: ${e?.message || e}`); fsSafe.closeSync(fd); fd = null; }
+        }
+        if (targetBuf) {
+          if (got + arr.length > targetBuf.length) {
+            // Guard against incorrect size; expand as needed.
+            const nb = new Uint8Array(got + arr.length);
+            nb.set(targetBuf.subarray(0, got), 0);
+            targetBuf = nb;
+          }
+          targetBuf.set(arr, got);
+        }
         got += arr.length;
         offset += arr.length;
         chunks++;
         if (!total && arr.length < MOBILE_DOWNLOAD_CHUNK_BYTES) break;
       }
-      buffer = target ? target.subarray(0, got) : new Uint8Array(0);
-      this.logInfo(`Downloaded (chunked) ${toRel}: ${Math.round(buffer.length / MB)}MB in ${chunks} chunks`);
+      if (fd != null) {
+        try { fsSafe.closeSync(fd); } catch (_) {}
+        buffer = null;
+        this.logInfo(`Downloaded (chunked->stream) ${toRel}: ${Math.round((total || got) / MB)}MB in ${chunks} chunks`);
+        // Ensure vault sees the file; re-read to buffer minimal (small metadata read)
+        buffer = await this.app.vault.adapter.readBinary(targetPath).catch(() => null);
+        if (!buffer) {
+          // fallback: read from fs
+          try { buffer = fsSafe.readFileSync(targetAbs); } catch (e) { this.logWarn(`Failed to read streamed file: ${e?.message || e}`); buffer = new Uint8Array(0); }
+        }
+      } else {
+        buffer = targetBuf ? targetBuf.subarray(0, got) : new Uint8Array(0);
+        this.logInfo(`Downloaded (chunked) ${toRel}: ${Math.round(buffer.length / MB)}MB in ${chunks} chunks`);
+      }
     } else {
       const bin = await this.http('GET', href, {}, true);
       buffer = new Uint8Array(bin || []);
