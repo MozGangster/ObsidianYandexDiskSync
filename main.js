@@ -4,7 +4,9 @@ const crypto = require('crypto');
 const API_BASE = 'https://cloud-api.yandex.net/v1/disk';
 const INDEX_FILE_NAME = 'index.json';
 const INDEX_FILE_VERSION = 1;
-const MOBILE_LARGE_FILE_BYTES = 25 * 1024 * 1024;
+const MB = 1024 * 1024;
+const MOBILE_LARGE_FILE_BYTES = 25 * MB;
+const MOBILE_DOWNLOAD_CHUNK_BYTES = 5 * MB;
 
 // Simple i18n dictionary for field descriptions only
 const I18N = {
@@ -701,6 +703,10 @@ class YandexDiskSyncPlugin extends Plugin {
     return capped;
   }
 
+  getEffectiveMaxSizeMB() {
+    return Number(this.settings.maxSizeMB) || 0;
+  }
+
   async loadSettings() {
     const data = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings || {});
@@ -1250,9 +1256,9 @@ class YandexDiskSyncPlugin extends Plugin {
     const ext = getExt(relPath);
     const excludedExts = Array.isArray(this.settings.excludeExtensions) ? this.settings.excludeExtensions : [];
     if (excludedExts.includes(ext)) return false;
-    const limitMb = Number(this.settings.maxSizeMB) || 0;
+    const limitMb = this.getEffectiveMaxSizeMB();
     if (limitMb > 0) {
-      const sizeLimit = limitMb * 1024 * 1024;
+      const sizeLimit = limitMb * MB;
       if (Number(item?.size) > sizeLimit) return false;
     }
     return true;
@@ -1439,6 +1445,8 @@ class YandexDiskSyncPlugin extends Plugin {
   listLocalFilesInScope() {
     const out = [];
     const all = this.app.vault.getAllLoadedFiles();
+    const limitMb = this.getEffectiveMaxSizeMB();
+    const sizeLimit = limitMb > 0 ? limitMb * MB : Infinity;
     for (const f of all) {
       if (f instanceof TFolder) continue; // folders
       const rel = this.toLocalRel(f.path);
@@ -1447,7 +1455,7 @@ class YandexDiskSyncPlugin extends Plugin {
       const ext = getExt(rel);
       if (this.settings.excludeExtensions.includes(ext)) continue;
       const size = f.stat.size;
-      if (size > this.settings.maxSizeMB * 1024 * 1024) continue;
+      if (sizeLimit !== Infinity && size > sizeLimit) continue;
       out.push({ rel, tfile: f, size, mtime: f.stat.mtime, ctime: f.stat.ctime, ext });
     }
     return out;
@@ -1631,7 +1639,7 @@ class YandexDiskSyncPlugin extends Plugin {
     });
     // Downloads
     await this.runWithConcurrency(downloads, downloadLimit, async (op) => {
-      await this.downloadRemoteFile(op.fromAbs, op.toRel);
+      await this.downloadRemoteFile(op.fromAbs, op.toRel, op.remote);
     });
 
     // Conflicts: for .md create two copies; for binaries, also duplicate
@@ -1726,22 +1734,39 @@ class YandexDiskSyncPlugin extends Plugin {
     this.logInfo(`Uploaded: ${rel}`);
   }
 
-  async downloadRemoteFile(fromAbs, toRel) {
+  async downloadRemoteFile(fromAbs, toRel, remoteMeta) {
     const href = await this.ydGetDownloadHref(fromAbs);
-    const bin = await this.http('GET', href, {}, true);
     const targetPath = this.fromLocalRel(toRel);
-    const existing = this.app.vault.getAbstractFileByPath(targetPath);
-    if (existing && existing instanceof TFile) {
-      await this.app.vault.modifyBinary(existing, bin);
-    } else if (existing && existing instanceof TFolder) {
-      // is a folder: append filename from fromAbs
-      const filename = toRel.split('/').pop();
-      await this.app.vault.createBinary(pathJoin(targetPath, filename), bin);
+    const size = Number(remoteMeta?.size) || 0;
+    const shouldChunk = this.isMobileDevice() && size > MOBILE_DOWNLOAD_CHUNK_BYTES;
+
+    let buffer;
+    if (shouldChunk) {
+      const chunks = [];
+      let offset = 0;
+      const total = size || 0;
+      while (offset < total) {
+        const end = Math.min(total - 1, offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1);
+        const bin = await this.http('GET', href, { headers: { Range: `bytes=${offset}-${end}` } }, true);
+        const arr = new Uint8Array(bin || []);
+        if (!arr.length) break;
+        chunks.push(arr);
+        offset += arr.length;
+      }
+      const totalLen = chunks.reduce((n, c) => n + c.length, 0);
+      buffer = new Uint8Array(totalLen);
+      let pos = 0;
+      for (const c of chunks) {
+        buffer.set(c, pos);
+        pos += c.length;
+      }
+      this.logInfo(`Downloaded (chunked) ${toRel}: ${Math.round(totalLen / MB)}MB in ${chunks.length} chunks`);
     } else {
-      // Ensure parent folders
-      await this.ensureFolderForPath(targetPath);
-      await this.app.vault.createBinary(targetPath, bin);
+      const bin = await this.http('GET', href, {}, true);
+      buffer = new Uint8Array(bin || []);
     }
+
+    await this.writeBufferToVault(targetPath, buffer);
     this.logInfo(`Downloaded: ${toRel}`);
   }
 
@@ -1755,6 +1780,21 @@ class YandexDiskSyncPlugin extends Plugin {
       const f = this.app.vault.getAbstractFileByPath(cur);
       if (!f) await this.app.vault.createFolder(cur);
     }
+  }
+
+  async writeBufferToVault(targetPath, buffer) {
+    const existing = this.app.vault.getAbstractFileByPath(targetPath);
+    if (existing && existing instanceof TFile) {
+      await this.app.vault.modifyBinary(existing, buffer);
+      return;
+    }
+    if (existing && existing instanceof TFolder) {
+      const filename = targetPath.split('/').pop();
+      await this.app.vault.createBinary(pathJoin(targetPath, filename), buffer);
+      return;
+    }
+    await this.ensureFolderForPath(targetPath);
+    await this.app.vault.createBinary(targetPath, buffer);
   }
 
   async resolveConflictByDuplication(rel, localTFile, remoteMeta) {
