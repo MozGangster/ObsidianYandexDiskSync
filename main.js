@@ -1,9 +1,10 @@
-const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder, normalizePath, getLanguage } = require('obsidian');
+const { Plugin, Notice, Modal, Setting, requestUrl, PluginSettingTab, TFile, TFolder, normalizePath, getLanguage, Platform } = require('obsidian');
 const crypto = require('crypto');
 
 const API_BASE = 'https://cloud-api.yandex.net/v1/disk';
 const INDEX_FILE_NAME = 'index.json';
 const INDEX_FILE_VERSION = 1;
+const MOBILE_LARGE_FILE_BYTES = 25 * 1024 * 1024;
 
 // Simple i18n dictionary for field descriptions only
 const I18N = {
@@ -211,7 +212,7 @@ class DiagnosticsModal extends Modal {
     });
 
     this.preEl = contentEl.createEl('pre', { cls: 'yds-modal-pre' });
-    pre.setText(this.text);
+    this.preEl.setText(this.text);
   }
 }
 
@@ -672,6 +673,32 @@ class YandexDiskSyncPlugin extends Plugin {
   t(key) {
     const lang = this.getLang();
     return (I18N[lang] && I18N[lang][key]) || (I18N.en && I18N.en[key]) || key;
+  }
+
+  isMobileDevice() {
+    try {
+      return !!(Platform?.isMobileApp || Platform?.isMobile);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  getEffectiveConcurrency(kind, ops) {
+    const configured = kind === 'upload' ? this.settings.uploadConcurrency : this.settings.downloadConcurrency;
+    const base = Math.max(1, Number(configured) || 1);
+    if (!this.isMobileDevice()) return base;
+    const items = Array.isArray(ops) ? ops : [];
+    const hasLarge = items.some((op) => {
+      const size = kind === 'upload' ? op?.from?.size : op?.remote?.size;
+      return Number(size) >= MOBILE_LARGE_FILE_BYTES;
+    });
+    if (hasLarge && base > 1) {
+      this.logWarn(`${kind} concurrency limited to 1 on mobile for large files (>= ${Math.round(MOBILE_LARGE_FILE_BYTES / (1024 * 1024))}MB)`);
+      return 1;
+    }
+    const capped = Math.min(2, base);
+    if (capped !== base) this.logInfo(`${kind} concurrency capped at ${capped} on mobile`);
+    return capped;
   }
 
   async loadSettings() {
@@ -1595,12 +1622,15 @@ class YandexDiskSyncPlugin extends Plugin {
     const rDeletes = plan.filter((x) => x.type === 'remote-delete');
     const lDeletes = plan.filter((x) => x.type === 'local-delete');
 
+    const uploadLimit = this.getEffectiveConcurrency('upload', uploads);
+    const downloadLimit = this.getEffectiveConcurrency('download', downloads);
+
     // Uploads
-    await this.runWithConcurrency(uploads, this.settings.uploadConcurrency, async (op) => {
+    await this.runWithConcurrency(uploads, uploadLimit, async (op) => {
       await this.uploadLocalFile(op.rel, op.from.tfile, op.toAbs);
     });
     // Downloads
-    await this.runWithConcurrency(downloads, this.settings.downloadConcurrency, async (op) => {
+    await this.runWithConcurrency(downloads, downloadLimit, async (op) => {
       await this.downloadRemoteFile(op.fromAbs, op.toRel);
     });
 
