@@ -6,7 +6,7 @@ const INDEX_FILE_NAME = 'index.json';
 const INDEX_FILE_VERSION = 1;
 const MB = 1024 * 1024;
 const MOBILE_LARGE_FILE_BYTES = 25 * MB;
-const MOBILE_DOWNLOAD_CHUNK_BYTES = 5 * MB;
+const MOBILE_DOWNLOAD_CHUNK_BYTES = 2 * MB;
 
 // Simple i18n dictionary for field descriptions only
 const I18N = {
@@ -1742,25 +1742,24 @@ class YandexDiskSyncPlugin extends Plugin {
 
     let buffer;
     if (shouldChunk) {
-      const chunks = [];
-      let offset = 0;
       const total = size || 0;
-      while (offset < total) {
-        const end = Math.min(total - 1, offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1);
+      const target = total > 0 ? new Uint8Array(total) : null;
+      let offset = 0;
+      let got = 0;
+      let chunks = 0;
+      while (!total || offset < total) {
+        const end = total ? Math.min(total - 1, offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1) : offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1;
         const bin = await this.http('GET', href, { headers: { Range: `bytes=${offset}-${end}` } }, true);
         const arr = new Uint8Array(bin || []);
         if (!arr.length) break;
-        chunks.push(arr);
+        if (target) target.set(arr, got);
+        got += arr.length;
         offset += arr.length;
+        chunks++;
+        if (!total && arr.length < MOBILE_DOWNLOAD_CHUNK_BYTES) break;
       }
-      const totalLen = chunks.reduce((n, c) => n + c.length, 0);
-      buffer = new Uint8Array(totalLen);
-      let pos = 0;
-      for (const c of chunks) {
-        buffer.set(c, pos);
-        pos += c.length;
-      }
-      this.logInfo(`Downloaded (chunked) ${toRel}: ${Math.round(totalLen / MB)}MB in ${chunks.length} chunks`);
+      buffer = target ? target.subarray(0, got) : new Uint8Array(0);
+      this.logInfo(`Downloaded (chunked) ${toRel}: ${Math.round(buffer.length / MB)}MB in ${chunks} chunks`);
     } else {
       const bin = await this.http('GET', href, {}, true);
       buffer = new Uint8Array(bin || []);
