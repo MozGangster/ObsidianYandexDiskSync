@@ -23,6 +23,10 @@ describe('download safeguards', () => {
 
         // Mock http to return the FULL content even when a small range is requested
         plugin.http = jest.fn().mockImplementation(async (method, url, opts) => {
+            // Return full content
+            if (opts.returnHeaders) {
+                return { body: fullContent.buffer, headers: {} };
+            }
             return fullContent.buffer;
         });
 
@@ -60,6 +64,9 @@ describe('download safeguards', () => {
 
         // Mock http to return overflow content for the first chunk
         plugin.http = jest.fn().mockImplementation(async (method, url, opts) => {
+            if (opts.returnHeaders) {
+                return { body: overflowContent.buffer, headers: {} };
+            }
             return overflowContent.buffer;
         });
 
@@ -85,7 +92,12 @@ describe('download safeguards', () => {
         const hugeSize = totalSize + 1024;
         const hugeContent = new Uint8Array(hugeSize).fill(3);
 
-        plugin.http = jest.fn().mockResolvedValue(hugeContent.buffer);
+        plugin.http = jest.fn().mockImplementation(async (method, url, opts) => {
+            if (opts.returnHeaders) {
+                return { body: hugeContent.buffer, headers: {} };
+            }
+            return hugeContent.buffer;
+        });
 
         await plugin.downloadRemoteFile('disk:/notes/overflow.bin', targetPath, remoteMeta);
 

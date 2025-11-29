@@ -271,7 +271,7 @@ class ProgressModal extends Modal {
         if (this.plugin?.registerInterval) {
           this.plugin.registerInterval(this._timer);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
   }
   onClose() {
@@ -287,7 +287,7 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    try { containerEl.addClass('yds-copyable'); } catch (_) {}
+    try { containerEl.addClass('yds-copyable'); } catch (_) { }
 
     new Setting(containerEl).setName(this.plugin.t('heading.required')).setHeading();
 
@@ -620,7 +620,7 @@ class YandexDiskSyncPlugin extends Plugin {
         this.settings._autoVaultNameApplied = true;
         await this.saveSettings();
       }
-    } catch (_) {}
+    } catch (_) { }
 
     this.addCommand({ id: 'sync-now', name: 'Sync now', callback: () => this.syncNow(false) });
     this.addCommand({ id: 'dry-run', name: 'Dry-run (plan only)', callback: () => this.syncNow(true) });
@@ -637,7 +637,7 @@ class YandexDiskSyncPlugin extends Plugin {
     // Optional: run sync on startup after layout is ready
     if (this.settings.syncOnStartup) {
       const start = () => {
-        if (this.settings.accessToken) this.syncNow(false).catch(() => {});
+        if (this.settings.accessToken) this.syncNow(false).catch(() => { });
       };
       const delayMs = Math.max(0, (Number(this.settings.syncOnStartupDelaySec) || 0) * 1000);
       try {
@@ -659,7 +659,7 @@ class YandexDiskSyncPlugin extends Plugin {
   onunload() {
     try {
       if (this._progressModal) this._progressModal.close();
-    } catch (_) {}
+    } catch (_) { }
     this._progressModal = null;
   }
 
@@ -895,7 +895,7 @@ class YandexDiskSyncPlugin extends Plugin {
       catch (_) { this.statusBar.classList?.add('yds-status-bar'); }
       this.statusBar.onclick = () => this.openProgress();
       this.updateStatusBar('Idle');
-    } catch (_) {}
+    } catch (_) { }
   }
 
   initRibbon() {
@@ -913,7 +913,7 @@ class YandexDiskSyncPlugin extends Plugin {
         },
       );
       this.ribbonEl.addClass('yandex-disk-sync-ribbon');
-    } catch (_) {}
+    } catch (_) { }
   }
 
   updateStatusBar(state) {
@@ -931,7 +931,7 @@ class YandexDiskSyncPlugin extends Plugin {
         this.ribbonEl.setAttribute('aria-label', txt);
         this.ribbonEl.setAttribute('title', txt);
       }
-    } catch (_) {}
+    } catch (_) { }
     const stateClasses = ['is-running', 'is-throttled', 'is-error', 'is-done'];
     for (const cls of stateClasses) {
       try { this.statusBar.removeClass(cls); }
@@ -1060,12 +1060,12 @@ class YandexDiskSyncPlugin extends Plugin {
     if (this._autoTimer) clearInterval(this._autoTimer);
     const minutes = this.settings.autoSyncIntervalMin;
     if (minutes > 0) {
-      this._autoTimer = setInterval(() => this.syncNow(false).catch(() => {}), minutes * 60 * 1000);
+      this._autoTimer = setInterval(() => this.syncNow(false).catch(() => { }), minutes * 60 * 1000);
       try {
         if (this.registerInterval) {
           this.registerInterval(this._autoTimer);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
@@ -1100,7 +1100,7 @@ class YandexDiskSyncPlugin extends Plugin {
       `Local scope: ${this.settings.localBasePath || '(root)'}`,
       `Remote base: ${this.getRemoteBase()}`,
       `Sync mode: ${this.settings.syncMode}, Delete: ${this.settings.deletePolicy}`,
-      `Conflict: ${this.settings.conflictStrategy}${this.settings.conflictStrategy==='newest-wins' ? ` (tolerance ${this.settings.timeSkewToleranceSec || 0}s)` : ''}`,
+      `Conflict: ${this.settings.conflictStrategy}${this.settings.conflictStrategy === 'newest-wins' ? ` (tolerance ${this.settings.timeSkewToleranceSec || 0}s)` : ''}`,
       `Concurrency: up ${this.settings.uploadConcurrency}, down ${this.settings.downloadConcurrency}`,
       `Auto-sync: ${this.settings.autoSyncIntervalMin} min`,
       `OAuth base: ${this.getOAuthBase()}`,
@@ -1144,7 +1144,7 @@ class YandexDiskSyncPlugin extends Plugin {
           ].join('\n');
           modal.setText(updated);
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }
 
@@ -1212,7 +1212,7 @@ class YandexDiskSyncPlugin extends Plugin {
     try {
       const electron = require('electron');
       if (electron?.shell?.openExternal) return electron.shell.openExternal(url);
-    } catch (_) {}
+    } catch (_) { }
     window.open(url, '_blank');
   }
 
@@ -1299,7 +1299,7 @@ class YandexDiskSyncPlugin extends Plugin {
           const ra = Number(res.headers['retry-after'] || res.headers['Retry-After'] || 1);
           const waitMs = Math.max(1000, ra * 1000);
           this.logWarn(`429 received, retrying after ${waitMs}ms`);
-          try { this.updateStatusBar('Throttled'); } catch (_) {}
+          try { this.updateStatusBar('Throttled'); } catch (_) { }
           await delay(waitMs);
           continue;
         }
@@ -1308,6 +1308,12 @@ class YandexDiskSyncPlugin extends Plugin {
           err.status = res.status;
           err.text = res.text;
           throw err;
+        }
+        if (opts.returnHeaders) {
+          return {
+            body: isBinary ? res.arrayBuffer : (opts.expectJson ? res.json : res),
+            headers: res.headers
+          };
         }
         return isBinary ? res.arrayBuffer : (opts.expectJson ? res.json : res);
       } catch (e) {
@@ -1320,11 +1326,11 @@ class YandexDiskSyncPlugin extends Plugin {
           if (e instanceof Error) {
             try {
               if (msg && e.message !== msg) e.message = msg;
-            } catch (_) {}
+            } catch (_) { }
             throw e;
           }
           const err = new Error(msg);
-          try { err.cause = e; } catch (_) {}
+          try { err.cause = e; } catch (_) { }
           throw err;
         }
         const backoff = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
@@ -1739,7 +1745,7 @@ class YandexDiskSyncPlugin extends Plugin {
     const lastSlash = toAbs.lastIndexOf('/');
     if (lastSlash > 0) {
       const parent = toAbs.slice(0, lastSlash) || toAbs;
-      await this.ydEnsureFolder(parent).catch(() => {});
+      await this.ydEnsureFolder(parent).catch(() => { });
     }
     const href = await this.ydGetUploadHref(toAbs, true);
     const data = await this.app.vault.readBinary(tfile);
@@ -1775,92 +1781,111 @@ class YandexDiskSyncPlugin extends Plugin {
         }
       }
       while (!total || offset < total) {
+        // If total is unknown, we cannot safely chunk without risking infinite loops if the server ignores Range.
+        // So if total is 0, we MUST assume single pass or rely on strict checks.
+
         const end = total ? Math.min(total - 1, offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1) : offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1;
         const requestedSize = end - offset + 1;
-        
-        const bin = await this.http('GET', href, { headers: { Range: `bytes=${offset}-${end}` } }, true);
+
+        // Cache busting: append timestamp to URL to prevent getting cached chunks
+        const chunkUrl = `${href}${href.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+
+        const resObj = await this.http('GET', chunkUrl, {
+          headers: { Range: `bytes=${offset}-${end}` },
+          returnHeaders: true
+        }, true);
+
+        const bin = resObj.body;
+        const headers = resObj.headers || {};
         const arr = new Uint8Array(bin || []);
+
         if (!arr.length) break;
 
+        // Check Content-Range
+        const contentRange = headers['content-range'] || headers['Content-Range'];
+        this.logInfo(`Chunk ${chunks + 1} range request: ${offset}-${end}, received len: ${arr.length}, content-range: ${contentRange}`);
+
         // --- SAFEGUARD: Check if server ignored Range and sent full file (or significantly more) ---
-        // If we requested ~2MB but got > 4MB (arbitrary safety margin), or if we got exactly 'total' size when we expected a chunk.
-        // Also if we got the *entire* remaining size in one go when we expected to chunk it.
-        const isWayTooBig = arr.length > requestedSize * 2; 
+        const isWayTooBig = arr.length > requestedSize * 2;
         const looksLikeFullFile = total && arr.length === total;
-        
+
+        // If Content-Range is missing but we requested a range, it's suspicious (server might have ignored it).
+        // But some servers are lazy.
+
         if (isWayTooBig || looksLikeFullFile) {
           this.logWarn(`Range ignored? Requested ${requestedSize} bytes, got ${arr.length}. Assuming full file download.`);
-          
-          // If we already wrote some chunks, this is bad because we now have the FULL file in 'arr'.
-          // We should discard previous chunks and just use this 'arr' as the file content.
-          // But we are in a stream... 
-          
+
           if (fd != null) {
-             // If we are streaming, we must reset the file.
-             try { 
-               fsSafe.closeSync(fd); 
-               // Re-open and truncate
-               fd = fsSafe.openSync(tmpAbs, 'w');
-               fsSafe.writeSync(fd, Buffer.from(arr));
-             } catch (e) {
-               this.logWarn(`Failed to rewrite full file in stream mode: ${e}`);
-               throw e; 
-             }
-             got = arr.length;
-             total = arr.length; // Update total to match reality
-             break; // We are done
+            try {
+              fsSafe.closeSync(fd);
+              fd = fsSafe.openSync(tmpAbs, 'w');
+              fsSafe.writeSync(fd, Buffer.from(arr));
+            } catch (e) {
+              this.logWarn(`Failed to rewrite full file in stream mode: ${e}`);
+              throw e;
+            }
+            got = arr.length;
+            total = arr.length;
+            break;
           } else {
-             // Memory mode
-             targetBuf = arr;
-             got = arr.length;
-             total = arr.length;
-             break;
+            targetBuf = arr;
+            got = arr.length;
+            total = arr.length;
+            break;
+          }
+        }
+
+        // --- SAFEGUARD: Content-Range validation ---
+        // If we have Content-Range, verify it matches what we asked (roughly).
+        // Format: bytes 0-1023/2048
+        if (contentRange) {
+          const match = contentRange.match(/bytes\s+(\d+)-(\d+)\//);
+          if (match) {
+            const startByte = parseInt(match[1], 10);
+            if (startByte !== offset) {
+              this.logWarn(`Content-Range mismatch! Expected start ${offset}, got ${startByte}. Aborting chunk to prevent corruption.`);
+              // If we are getting the wrong chunk, we are likely in a loop or race condition.
+              // We should probably stop.
+              throw new Error(`Content-Range mismatch: expected ${offset}, got ${startByte}`);
+            }
           }
         }
 
         // --- SAFEGUARD: Overflow protection ---
-        // If we know the total, don't write past it.
         let dataToWrite = arr;
         if (total && got + arr.length > total) {
-           const needed = total - got;
-           if (needed < 0) {
-             // Should not happen if logic is correct, but safety first
-             break; 
-           }
-           this.logWarn(`Received more data than expected (got +${arr.length}, needed ${needed}). Truncating.`);
-           dataToWrite = arr.subarray(0, needed);
+          const needed = total - got;
+          if (needed < 0) break;
+          this.logWarn(`Received more data than expected (got +${arr.length}, needed ${needed}). Truncating.`);
+          dataToWrite = arr.subarray(0, needed);
         }
 
         if (fd != null) {
           try { fsSafe.writeSync(fd, Buffer.from(dataToWrite)); }
-          catch (e) { this.logWarn(`Write chunk failed, switching to memory: ${e?.message || e}`); try { fsSafe.closeSync(fd); } catch (_) {} fd = null; }
+          catch (e) { this.logWarn(`Write chunk failed, switching to memory: ${e?.message || e}`); try { fsSafe.closeSync(fd); } catch (_) { } fd = null; }
         }
-        
+
         if (targetBuf) {
-          // If we switched to memory or were in memory
           if (got + dataToWrite.length > targetBuf.length) {
-            // Guard against incorrect size; expand as needed.
             const nb = new Uint8Array(got + dataToWrite.length);
             nb.set(targetBuf.subarray(0, got), 0);
             targetBuf = nb;
           }
           targetBuf.set(dataToWrite, got);
         }
-        
+
         got += dataToWrite.length;
-        offset += dataToWrite.length; // Logically advance by what we *kept*
+        offset += dataToWrite.length;
         chunks++;
-        this.logInfo(`Chunk ${chunks}: +${dataToWrite.length} bytes (total ${got}${total ? `/${total}` : ''}) for ${toRel}`);
-        
-        // If we didn't get a full chunk, we are probably done
+
         if (!total && arr.length < MOBILE_DOWNLOAD_CHUNK_BYTES) break;
         if (total && got >= total) break;
       }
       if (fd != null) {
-        try { fsSafe.closeSync(fd); } catch (_) {}
+        try { fsSafe.closeSync(fd); } catch (_) { }
         try {
           // Atomic replace: remove old, then rename temp into place
-          try { fsSafe.unlinkSync(targetAbs); } catch (_) {}
+          try { fsSafe.unlinkSync(targetAbs); } catch (_) { }
           fsSafe.renameSync(tmpAbs, targetAbs);
         } catch (e) {
           this.logWarn(`Rename streamed file failed: ${e?.message || e}`);
@@ -1868,7 +1893,7 @@ class YandexDiskSyncPlugin extends Plugin {
         buffer = null;
         this.logInfo(`Downloaded (stream) ${toRel}: ~${Math.round((total || got) / MB)}MB in ${chunks} chunks`);
         // Let vault pick up file; avoid reading full content
-        try { await this.app.vault.adapter.stat(targetPath); } catch (_) {}
+        try { await this.app.vault.adapter.stat(targetPath); } catch (_) { }
         return; // already written to disk
       } else {
         buffer = targetBuf ? targetBuf.subarray(0, got) : new Uint8Array(0);
