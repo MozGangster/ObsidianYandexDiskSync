@@ -1184,6 +1184,15 @@ class YandexDiskSyncPlugin extends Plugin {
     return `${base}/${folder}`;
   }
 
+  maskUrl(url) {
+    try {
+      const u = new URL(url);
+      return `${u.origin}${u.pathname}`;
+    } catch (_) {
+      return url;
+    }
+  }
+
   // OAuth helpers
   startOAuthFlow() {
     if (!this.settings.clientId) {
@@ -1312,7 +1321,8 @@ class YandexDiskSyncPlugin extends Plugin {
         if (opts.returnHeaders) {
           return {
             body: isBinary ? res.arrayBuffer : (opts.expectJson ? res.json : res),
-            headers: res.headers
+            headers: res.headers,
+            status: res.status
           };
         }
         return isBinary ? res.arrayBuffer : (opts.expectJson ? res.json : res);
@@ -1790,6 +1800,8 @@ class YandexDiskSyncPlugin extends Plugin {
         // Cache busting: append timestamp to URL to prevent getting cached chunks
         const chunkUrl = `${href}${href.includes('?') ? '&' : '?'}_t=${Date.now()}`;
 
+        this.logInfo(`Chunk ${chunks + 1} request -> ${this.maskUrl(chunkUrl)}, range ${offset}-${end}, expect ${requestedSize}`);
+
         const resObj = await this.http('GET', chunkUrl, {
           headers: { Range: `bytes=${offset}-${end}` },
           returnHeaders: true
@@ -1797,13 +1809,18 @@ class YandexDiskSyncPlugin extends Plugin {
 
         const bin = resObj.body;
         const headers = resObj.headers || {};
+        const status = resObj.status;
         const arr = new Uint8Array(bin || []);
 
         if (!arr.length) break;
 
         // Check Content-Range
         const contentRange = headers['content-range'] || headers['Content-Range'];
-        this.logInfo(`Chunk ${chunks + 1} range request: ${offset}-${end}, received len: ${arr.length}, content-range: ${contentRange}`);
+        this.logInfo(`Chunk ${chunks + 1} range request: ${offset}-${end}, received len: ${arr.length}, status: ${status ?? 'n/a'}, content-range: ${contentRange || '(missing)'}`);
+
+        if (!contentRange) {
+          this.logWarn(`Chunk ${chunks + 1}: Content-Range missing (Range may be ignored by redirect).`);
+        }
 
         // --- SAFEGUARD: Check if server ignored Range and sent full file (or significantly more) ---
         const isWayTooBig = arr.length > requestedSize * 2;
