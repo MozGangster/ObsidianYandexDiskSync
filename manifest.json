@@ -1,7 +1,7 @@
 {
   "id": "yandex-disk-sync",
   "name": "Yandex Disk Sync",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "minAppVersion": "1.8.0",
   "description": "Two-way sync of your vault with Yandex.Disk via REST + OAuth.",
   "author": "Ivan Z.",

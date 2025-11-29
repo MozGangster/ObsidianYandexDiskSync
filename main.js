@@ -1761,7 +1761,6 @@ class YandexDiskSyncPlugin extends Plugin {
     const shouldChunk = this.isMobileDevice() && size > MOBILE_DOWNLOAD_CHUNK_BYTES;
 
     this.logInfo(`Download start ${toRel}: remote=${fromAbs}, size=${size}, chunk=${MOBILE_DOWNLOAD_CHUNK_BYTES}, mode=${shouldChunk ? 'chunked' : 'single'}`);
-    this.logInfo(`Download href: ${href}`);
 
     let buffer;
     if (shouldChunk) {
@@ -1793,8 +1792,6 @@ class YandexDiskSyncPlugin extends Plugin {
 
         // Cache busting: append timestamp to URL to prevent getting cached chunks
         const chunkUrl = `${href}${href.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-
-        this.logInfo(`Chunk ${chunks + 1} request -> ${chunkUrl}, range ${offset}-${end}, expect ${requestedSize}`);
 
         const resObj = await this.http('GET', chunkUrl, {
           headers: { Range: `bytes=${offset}-${end}` },
