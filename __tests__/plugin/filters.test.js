@@ -39,7 +39,7 @@ describe('sync filters', () => {
       settings: {
         ignorePatterns: ['private/**'],
         excludeExtensions: ['png'],
-        maxSizeMB: 1,
+        maxSizeDesktopMB: 1,
       },
     });
     plugin.invalidateIgnoreCache();

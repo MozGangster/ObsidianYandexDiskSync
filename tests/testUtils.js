@@ -9,6 +9,7 @@ function buildApp(overrides = {}) {
     read: jest.fn().mockResolvedValue('{}'),
     write: jest.fn().mockResolvedValue(undefined),
     mkdir: jest.fn().mockResolvedValue(undefined),
+    writeBinary: jest.fn().mockResolvedValue(undefined),
   };
 
   const vault = Object.assign(
@@ -83,6 +84,9 @@ function createMockAdapter(initial = {}) {
       return fileStore.get(path);
     }),
     write: jest.fn(async (path, data) => {
+      fileStore.set(path, data);
+    }),
+    writeBinary: jest.fn(async (path, data) => {
       fileStore.set(path, data);
     }),
     mkdir: jest.fn(async (path) => {

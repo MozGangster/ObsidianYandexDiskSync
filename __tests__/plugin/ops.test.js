@@ -96,41 +96,46 @@ describe('sync operations', () => {
     const plugin = createPlugin();
     const bin = new Uint8Array([5, 6]);
     plugin.ydGetDownloadHref = jest.fn().mockResolvedValue('https://download');
-    plugin.http = jest.fn().mockResolvedValue(bin);
+    plugin.http = jest.fn().mockResolvedValue({ body: bin, headers: {}, status: 206 });
     const existing = makeTFile('notes/file.bin');
     plugin.app.vault.getAbstractFileByPath.mockReturnValue(existing);
 
-    await plugin.downloadRemoteFile('disk:/Root/notes/file.bin', 'notes/file.bin');
+    await plugin.downloadRemoteFile('disk:/Root/notes/file.bin', 'notes/file.bin', { size: bin.length });
 
-    expect(plugin.app.vault.modifyBinary).toHaveBeenCalledWith(existing, bin);
-    expect(plugin.http).toHaveBeenCalledWith('GET', 'https://download', {}, true);
+    expect(plugin.app.vault.adapter.writeBinary).toHaveBeenCalledWith('notes/file.bin', bin);
+    expect(plugin.http).toHaveBeenCalledWith(
+      'GET',
+      expect.stringContaining('https://download'),
+      { headers: { Range: 'bytes=0-1' }, returnHeaders: true },
+      true
+    );
   });
 
   test('downloadRemoteFile creates file in existing folder', async () => {
     const plugin = createPlugin();
     const bin = new Uint8Array([7]);
     plugin.ydGetDownloadHref = jest.fn().mockResolvedValue('https://download2');
-    plugin.http = jest.fn().mockResolvedValue(bin);
+    plugin.http = jest.fn().mockResolvedValue({ body: bin, headers: {}, status: 206 });
     const folder = new (require('obsidian').TFolder)('notes');
     plugin.app.vault.getAbstractFileByPath.mockReturnValue(folder);
 
-    await plugin.downloadRemoteFile('disk:/Root/notes/sub/file.bin', 'notes/sub/file.bin');
+    await plugin.downloadRemoteFile('disk:/Root/notes/sub/file.bin', 'notes/sub/file.bin', { size: bin.length });
 
-    expect(plugin.app.vault.createBinary).toHaveBeenCalledWith('notes/sub/file.bin/file.bin', bin);
+    expect(plugin.app.vault.adapter.writeBinary).toHaveBeenCalledWith('notes/sub/file.bin/file.bin', bin);
   });
 
   test('downloadRemoteFile creates path when file is missing', async () => {
     const plugin = createPlugin();
     const bin = new Uint8Array([9]);
     plugin.ydGetDownloadHref = jest.fn().mockResolvedValue('https://d');
-    plugin.http = jest.fn().mockResolvedValue(bin);
+    plugin.http = jest.fn().mockResolvedValue({ body: bin, headers: {}, status: 206 });
     plugin.app.vault.getAbstractFileByPath.mockReturnValue(null);
     plugin.ensureFolderForPath = jest.fn().mockResolvedValue();
 
-    await plugin.downloadRemoteFile('disk:/Root/new/file.md', 'new/file.md');
+    await plugin.downloadRemoteFile('disk:/Root/new/file.md', 'new/file.md', { size: bin.length });
 
     expect(plugin.ensureFolderForPath).toHaveBeenCalledWith('new/file.md');
-    expect(plugin.app.vault.createBinary).toHaveBeenCalledWith('new/file.md', bin);
+    expect(plugin.app.vault.adapter.writeBinary).toHaveBeenCalledWith('new/file.md', bin);
   });
 
   test('ensureFolderForPath creates missing directories', async () => {
@@ -180,7 +185,7 @@ describe('sync operations', () => {
 
     const expectedLocal = 'archive (conflict 2024-01-01-00-00-00 local).zip';
     const expectedRemote = 'archive (conflict 2024-01-01-00-00-00 remote).zip';
-    expect(plugin.app.vault.createBinary).toHaveBeenCalledWith(expectedLocal, local);
-    expect(plugin.app.vault.createBinary).toHaveBeenCalledWith(expectedRemote, remote);
+    expect(plugin.app.vault.adapter.writeBinary).toHaveBeenCalledWith(expectedLocal, local);
+    expect(plugin.app.vault.adapter.writeBinary).toHaveBeenCalledWith(expectedRemote, remote);
   });
 });

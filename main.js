@@ -30,7 +30,8 @@ const I18N = {
     'desc.syncNow': 'Run sync with current settings (mode, deletes, filters)',
     'desc.dryRun': 'Preview the sync plan without making changes. Opens a diagnostics window with the list of planned operations.',
     'desc.diagnostics': 'Open diagnostics: shows environment summary (paths, mode), last API check, last HTTP error, and recent logs. Set how many lines to show below.',
-    'desc.maxSize': 'Skip local files larger than this during uploads. Default: 200.',
+    'desc.maxSizeDesktop': 'Skip files larger than this on desktop. Default: 200.',
+    'desc.maxSizeMobile': 'Skip files larger than this on mobile. Default: 200.',
     'desc.concurrency': 'Parallel transfers (upload/download). High values may cause 429/409; recommended 1–3 / 1–4.',
     'desc.syncOnStartupDelay': 'Delay before startup sync runs (seconds). 0 = no delay.',
     'heading.required': 'Required fields',
@@ -57,7 +58,8 @@ const I18N = {
     'desc.syncNow': 'Запустить синхронизацию по текущим настройкам (режим, удаления, фильтры)',
     'desc.dryRun': 'Предпросмотр плана без изменений. Откроется окно диагностики со списком запланированных операций.',
     'desc.diagnostics': 'Открыть диагностику: сводка окружения (пути, режим), последняя проверка API, последний HTTP‑код и последние строки журнала. Ниже можно указать, сколько строк показывать.',
-    'desc.maxSize': 'Пропускать локальные файлы больше этого порога при выгрузке. По умолчанию: 200.',
+    'desc.maxSizeDesktop': 'Пропускать файлы больше этого порога на десктопе. По умолчанию: 200.',
+    'desc.maxSizeMobile': 'Пропускать файлы больше этого порога на мобильном. По умолчанию: 200.',
     'desc.concurrency': 'Параллельные передачи (upload/download). Большие значения могут вызвать 429/409; рекомендация 1–3 / 1–4.',
     'desc.syncOnStartupDelay': 'Задержка перед запуском синхронизации при старте (в секундах). 0 = без задержки.',
     'heading.required': 'Обязательные',
@@ -83,7 +85,8 @@ const DEFAULT_SETTINGS = {
   // Filters
   ignorePatterns: ['.obsidian/**', '**/.trash/**'],
   excludeExtensions: [],
-  maxSizeMB: 200,
+  maxSizeDesktopMB: 200,
+  maxSizeMobileMB: 4,
   // Policies
   syncMode: 'two-way', // 'two-way' | 'upload' | 'download'
   deletePolicy: 'mirror', // 'mirror' | 'skip'
@@ -490,15 +493,26 @@ class YandexDiskSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Max file size (MB)')
-      .setDesc(this.plugin.t('desc.maxSize'))
+      .setName('Max file size desktop (MB)')
+      .setDesc(this.plugin.t('desc.maxSizeDesktop'))
       .addText((txt) =>
         txt
-          .setValue(String(this.plugin.settings.maxSizeMB))
+          .setValue(String(this.plugin.settings.maxSizeDesktopMB))
           .onChange(async (v) => {
             const n = Number(v);
             if (!Number.isFinite(n) || n <= 0) return;
-            this.plugin.settings.maxSizeMB = n;
+            this.plugin.settings.maxSizeDesktopMB = n;
+            await this.plugin.saveSettings();
+          }),
+      )
+      .addText((txt) =>
+        txt
+          .setPlaceholder('mobile')
+          .setValue(String(this.plugin.settings.maxSizeMobileMB))
+          .onChange(async (v) => {
+            const n = Number(v);
+            if (!Number.isFinite(n) || n <= 0) return;
+            this.plugin.settings.maxSizeMobileMB = n;
             await this.plugin.saveSettings();
           }),
       );
@@ -706,12 +720,27 @@ class YandexDiskSyncPlugin extends Plugin {
   }
 
   getEffectiveMaxSizeMB() {
-    return Number(this.settings.maxSizeMB) || 0;
+    const desktop = Number(this.settings.maxSizeDesktopMB);
+    const mobile = Number(this.settings.maxSizeMobileMB);
+    const legacy = Number(this.settings.maxSizeMB);
+    if (this.isMobileDevice()) {
+      if (Number.isFinite(mobile) && mobile > 0) return mobile;
+      if (Number.isFinite(legacy) && legacy > 0) return legacy;
+    }
+    if (Number.isFinite(desktop) && desktop > 0) return desktop;
+    if (Number.isFinite(legacy) && legacy > 0) return legacy;
+    return 0;
   }
 
   async loadSettings() {
     const data = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings || {});
+
+    // Legacy migration: if old maxSizeMB exists, propagate to new fields when unset
+    if (this.settings.maxSizeMB && (!this.settings.maxSizeDesktopMB || !this.settings.maxSizeMobileMB)) {
+      if (!this.settings.maxSizeDesktopMB) this.settings.maxSizeDesktopMB = this.settings.maxSizeMB;
+      if (!this.settings.maxSizeMobileMB) this.settings.maxSizeMobileMB = this.settings.maxSizeMB;
+    }
 
     this._persistedExtra = {};
     if (data && typeof data === 'object') {
@@ -886,6 +915,18 @@ class YandexDiskSyncPlugin extends Plugin {
     }
     this.indexHash = newHash;
     this.indexMeta = { hash: newHash, version: INDEX_FILE_VERSION };
+  }
+
+  async deleteTargetIfFile(targetPath) {
+    try {
+      const existing = this.app?.vault?.getAbstractFileByPath?.(targetPath);
+      if (existing && existing instanceof TFile) {
+        await this.app.vault.delete(existing);
+        this.logInfo(`Deleted existing file before write: ${targetPath}`);
+      }
+    } catch (e) {
+      this.logWarn(`Failed to delete existing file before write ${targetPath}: ${e?.message || e}`);
+    }
   }
 
   initStatusBar() {
@@ -1600,10 +1641,22 @@ class YandexDiskSyncPlugin extends Plugin {
         new Notice('Connect account in settings first.');
         return;
       }
-      this.logInfo(`Sync started (dryRun=${dryRun})`);
+      this.logInfo(`Sync started (dryRun=${dryRun}, mode=${this.settings.syncMode}, delete=${this.settings.deletePolicy})`);
       this.startRun(dryRun, 0);
       const { plan, remoteMap } = await this.buildPlan();
       this.setRunPlan(plan);
+      const counts = plan.reduce((acc, op) => {
+        acc[op.type] = (acc[op.type] || 0) + 1;
+        return acc;
+      }, {});
+      this.logInfo(
+        `Plan built: total ${plan.length}` +
+        ` | uploads ${counts.upload || 0}` +
+        ` | downloads ${counts.download || 0}` +
+        ` | conflicts ${counts.conflict || 0}` +
+        ` | remote-delete ${counts['remote-delete'] || 0}` +
+        ` | local-delete ${counts['local-delete'] || 0}`
+      );
       if (dryRun) {
         // Render plan in a safe, readable way without circular refs
         const lines = plan.map((op) => {
@@ -1757,163 +1810,65 @@ class YandexDiskSyncPlugin extends Plugin {
   async downloadRemoteFile(fromAbs, toRel, remoteMeta) {
     const href = await this.ydGetDownloadHref(fromAbs);
     const targetPath = this.fromLocalRel(toRel);
-    const size = Number(remoteMeta?.size) || 0;
-    const shouldChunk = this.isMobileDevice() && size > MOBILE_DOWNLOAD_CHUNK_BYTES;
-
-    this.logInfo(`Download start ${toRel}: remote=${fromAbs}, size=${size}, chunk=${MOBILE_DOWNLOAD_CHUNK_BYTES}, mode=${shouldChunk ? 'chunked' : 'single'}`);
-
-    let buffer;
-    if (shouldChunk) {
-      let total = size || 0;
-      const targetAbs = this.getAbsolutePath(targetPath);
-      const tmpAbs = targetAbs ? `${targetAbs}.yds.part` : null;
-      const canStream = fsSafe && targetAbs && tmpAbs;
-      let offset = 0;
-      let got = 0;
-      let chunks = 0;
-      let targetBuf = canStream ? null : (total > 0 ? new Uint8Array(total) : null);
-      let fd = null;
-      if (canStream) {
-        try {
-          const dir = tmpAbs.split('/').slice(0, -1).join('/');
-          fsSafe.mkdirSync(dir, { recursive: true });
-          fd = fsSafe.openSync(tmpAbs, 'w');
-        } catch (e) {
-          this.logWarn(`Stream init failed, fallback to memory: ${e?.message || e}`);
-          fd = null;
-        }
-      }
-      while (!total || offset < total) {
-        // If total is unknown, we cannot safely chunk without risking infinite loops if the server ignores Range.
-        // So if total is 0, we MUST assume single pass or rely on strict checks.
-
-        const end = total ? Math.min(total - 1, offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1) : offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1;
-        const requestedSize = end - offset + 1;
-
-        // Cache busting: append timestamp to URL to prevent getting cached chunks
-        const chunkUrl = `${href}${href.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-
-        const resObj = await this.http('GET', chunkUrl, {
-          headers: { Range: `bytes=${offset}-${end}` },
-          returnHeaders: true
-        }, true);
-
-        const bin = resObj.body;
-        const headers = resObj.headers || {};
-        const status = resObj.status;
-        const arr = new Uint8Array(bin || []);
-
-        if (!arr.length) break;
-
-        // Check Content-Range
-        const contentRange = headers['content-range'] || headers['Content-Range'];
-        this.logInfo(`Chunk ${chunks + 1} range request: ${offset}-${end}, received len: ${arr.length}, status: ${status ?? 'n/a'}, content-range: ${contentRange || '(missing)'}`);
-
-        if (!contentRange) {
-          this.logWarn(`Chunk ${chunks + 1}: Content-Range missing (Range may be ignored by redirect).`);
-        }
-
-        // --- SAFEGUARD: Check if server ignored Range and sent full file (or significantly more) ---
-        const isWayTooBig = arr.length > requestedSize * 2;
-        const looksLikeFullFile = total && arr.length === total;
-
-        // If Content-Range is missing but we requested a range, it's suspicious (server might have ignored it).
-        // But some servers are lazy.
-
-        if (isWayTooBig || looksLikeFullFile) {
-          this.logWarn(`Range ignored? Requested ${requestedSize} bytes, got ${arr.length}. Assuming full file download.`);
-
-          if (fd != null) {
-            try {
-              fsSafe.closeSync(fd);
-              fd = fsSafe.openSync(tmpAbs, 'w');
-              fsSafe.writeSync(fd, Buffer.from(arr));
-            } catch (e) {
-              this.logWarn(`Failed to rewrite full file in stream mode: ${e}`);
-              throw e;
-            }
-            got = arr.length;
-            total = arr.length;
-            break;
-          } else {
-            targetBuf = arr;
-            got = arr.length;
-            total = arr.length;
-            break;
-          }
-        }
-
-        // --- SAFEGUARD: Content-Range validation ---
-        // If we have Content-Range, verify it matches what we asked (roughly).
-        // Format: bytes 0-1023/2048
-        if (contentRange) {
-          const match = contentRange.match(/bytes\s+(\d+)-(\d+)\//);
-          if (match) {
-            const startByte = parseInt(match[1], 10);
-            if (startByte !== offset) {
-              this.logWarn(`Content-Range mismatch! Expected start ${offset}, got ${startByte}. Aborting chunk to prevent corruption.`);
-              // If we are getting the wrong chunk, we are likely in a loop or race condition.
-              // We should probably stop.
-              throw new Error(`Content-Range mismatch: expected ${offset}, got ${startByte}`);
-            }
-          }
-        }
-
-        // --- SAFEGUARD: Overflow protection ---
-        let dataToWrite = arr;
-        if (total && got + arr.length > total) {
-          const needed = total - got;
-          if (needed < 0) break;
-          this.logWarn(`Received more data than expected (got +${arr.length}, needed ${needed}). Truncating.`);
-          dataToWrite = arr.subarray(0, needed);
-        }
-
-        if (fd != null) {
-          try { fsSafe.writeSync(fd, Buffer.from(dataToWrite)); }
-          catch (e) { this.logWarn(`Write chunk failed, switching to memory: ${e?.message || e}`); try { fsSafe.closeSync(fd); } catch (_) { } fd = null; }
-        }
-
-        if (targetBuf) {
-          if (got + dataToWrite.length > targetBuf.length) {
-            const nb = new Uint8Array(got + dataToWrite.length);
-            nb.set(targetBuf.subarray(0, got), 0);
-            targetBuf = nb;
-          }
-          targetBuf.set(dataToWrite, got);
-        }
-
-        got += dataToWrite.length;
-        offset += dataToWrite.length;
-        chunks++;
-
-        if (!total && arr.length < MOBILE_DOWNLOAD_CHUNK_BYTES) break;
-        if (total && got >= total) break;
-      }
-      if (fd != null) {
-        try { fsSafe.closeSync(fd); } catch (_) { }
-        try {
-          // Atomic replace: remove old, then rename temp into place
-          try { fsSafe.unlinkSync(targetAbs); } catch (_) { }
-          fsSafe.renameSync(tmpAbs, targetAbs);
-        } catch (e) {
-          this.logWarn(`Rename streamed file failed: ${e?.message || e}`);
-        }
-        buffer = null;
-        this.logInfo(`Downloaded (stream) ${toRel}: ~${Math.round((total || got) / MB)}MB in ${chunks} chunks`);
-        // Let vault pick up file; avoid reading full content
-        try { await this.app.vault.adapter.stat(targetPath); } catch (_) { }
-        return; // already written to disk
-      } else {
-        buffer = targetBuf ? targetBuf.subarray(0, got) : new Uint8Array(0);
-        this.logInfo(`Downloaded (chunked) ${toRel}: ${Math.round(buffer.length / MB)}MB in ${chunks} chunks`);
-      }
-    } else {
-      const bin = await this.http('GET', href, {}, true);
-      buffer = new Uint8Array(bin || []);
+    const size = Number(remoteMeta?.size);
+    if (!Number.isFinite(size) || size <= 0) {
+      this.logWarn(`Download skipped ${toRel}: remote size missing/invalid`);
+      return;
     }
 
-    if (buffer && buffer.length) {
-      await this.writeBufferToVault(targetPath, buffer);
+    this.logInfo(`Download start ${toRel}: remote=${fromAbs}, size=${size}, chunk=${MOBILE_DOWNLOAD_CHUNK_BYTES}, mode=chunked`);
+
+    let offset = 0;
+    let got = 0;
+    let chunks = 0;
+    const targetBuf = new Uint8Array(size);
+    while (offset < size) {
+
+      const end = Math.min(size - 1, offset + MOBILE_DOWNLOAD_CHUNK_BYTES - 1);
+      const chunkUrl = `${href}${href.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+
+      const resObj = await this.http('GET', chunkUrl, {
+        headers: { Range: `bytes=${offset}-${end}` },
+        returnHeaders: true
+      }, true);
+
+      const bin = resObj.body;
+      const headers = resObj.headers || {};
+      const status = resObj.status;
+      const arr = new Uint8Array(bin || []);
+
+      if (!arr.length) break;
+
+      const contentRange = headers['content-range'] || headers['Content-Range'];
+      this.logInfo(`Chunk ${chunks + 1} range request: ${offset}-${end}, received len: ${arr.length}, status: ${status ?? 'n/a'}, content-range: ${contentRange || '(missing)'}`);
+
+      const remaining = size - got;
+      if (arr.length > remaining) {
+        this.logWarn(`Chunk too large for ${toRel}: received=${arr.length}, remaining=${remaining}, total=${size}`);
+        throw new Error(`Chunk exceeds expected size for ${toRel}`);
+      }
+
+      targetBuf.set(arr, got);
+
+      got += arr.length;
+      offset += arr.length;
+      chunks++;
+
+      if (got >= size) break;
+    }
+    if (got !== size) {
+      this.logWarn(`Size mismatch after chunked buffer: got ${got}, expected ${size}`);
+      throw new Error(`Chunked download incomplete for ${toRel}`);
+    }
+    this.logInfo(`Downloaded (chunked) ${toRel}: ${Math.round(targetBuf.length / MB)}MB in ${chunks} chunks (bytes=${targetBuf.length}, expected=${size})`);
+
+    if (targetBuf.length) {
+      await this.deleteTargetIfFile(targetPath);
+      await this.writeBufferToVault(targetPath, targetBuf);
+      this.logInfo(`Downloaded (vault write) ${toRel}: size=${targetBuf.length}, expected=${size}`);
+      if (targetBuf.length !== size) {
+        this.logWarn(`Size mismatch after vault write: got ${targetBuf.length}, expected ${size}`);
+      }
     }
     this.logInfo(`Downloaded: ${toRel}`);
   }
@@ -1932,20 +1887,28 @@ class YandexDiskSyncPlugin extends Plugin {
 
   async writeBufferToVault(targetPath, buffer) {
     const existing = this.app.vault.getAbstractFileByPath(targetPath);
-    if (existing && existing instanceof TFile) {
-      await this.app.vault.modifyBinary(existing, buffer);
-      return;
-    }
+    const adapter = this.app?.vault?.adapter;
+    const canWrite = adapter && typeof adapter.writeBinary === 'function';
+    const existingType = existing ? (existing instanceof TFile ? 'file' : existing instanceof TFolder ? 'folder' : 'other') : 'none';
+    this.logInfo(`writeBufferToVault: target=${targetPath}, existing=${existingType}, bytes=${buffer?.length ?? 0}, adapterWrite=${canWrite ? 'yes' : 'no'}`);
+
+    if (!canWrite) throw new Error('Vault adapter.writeBinary unavailable');
+
+    let pathToWrite = targetPath;
     if (existing && existing instanceof TFolder) {
       const filename = targetPath.split('/').pop();
-      await this.app.vault.createBinary(pathJoin(targetPath, filename), buffer);
-      return;
+      pathToWrite = pathJoin(targetPath, filename);
     }
-    await this.ensureFolderForPath(targetPath);
-    await this.app.vault.createBinary(targetPath, buffer);
+
+    try { await this.ensureFolderForPath(pathToWrite); } catch (_) { }
+
+    this.logInfo(`writeBufferToVault1: adapter write ${pathToWrite}`);
+    await adapter.writeBinary(pathToWrite, buffer);
+    this.logInfo(`writeBufferToVault2: adapter write ${pathToWrite}`);
   }
 
   async resolveConflictByDuplication(rel, localTFile, remoteMeta) {
+    this.logInfo(`resolveConflictByDuplication start: ${rel}`);
     // Read remote and local, create conflict files side by side.
     const ts = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
     const ext = getExt(rel);
@@ -1965,16 +1928,12 @@ class YandexDiskSyncPlugin extends Plugin {
     await this.ensureFolderForPath(remoteConflictPath);
 
     if (localIsBinary) {
-      // Binary: duplicate as-is
+      // Binary: duplicate as-is via writeBufferToVault
       const localBuf = await this.app.vault.readBinary(localTFile).catch(() => new Uint8Array());
-      await this.app.vault.createBinary(localConflictPath, localBuf).catch(async () => {
-        const f = this.app.vault.getAbstractFileByPath(localConflictPath);
-        if (f) await this.app.vault.modifyBinary(f, localBuf);
-      });
-      await this.app.vault.createBinary(remoteConflictPath, remoteBuf).catch(async () => {
-        const f = this.app.vault.getAbstractFileByPath(remoteConflictPath);
-        if (f) await this.app.vault.modifyBinary(f, remoteBuf);
-      });
+      await this.ensureFolderForPath(localConflictPath);
+      await this.ensureFolderForPath(remoteConflictPath);
+      await this.writeBufferToVault(localConflictPath, localBuf);
+      await this.writeBufferToVault(remoteConflictPath, remoteBuf);
     } else {
       // Markdown: store as text
       let remoteText = '';
@@ -1991,6 +1950,7 @@ class YandexDiskSyncPlugin extends Plugin {
       });
     }
     this.logWarn(`Conflict -> duplicated: ${conflictLocal}, ${conflictRemote}`);
+    this.logInfo(`resolveConflictByDuplication done: ${rel}`);
   }
 }
 

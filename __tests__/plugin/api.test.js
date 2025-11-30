@@ -68,7 +68,7 @@ describe('Yandex Disk API helpers', () => {
         localBasePath: 'vault',
         ignorePatterns: ['ignore/**'],
         excludeExtensions: ['png'],
-        maxSizeMB: 1,
+        maxSizeDesktopMB: 1,
       },
     });
     const ok = { path: 'vault/notes/note.md', stat: { size: 100, mtime: 2000, ctime: 1000 } };
